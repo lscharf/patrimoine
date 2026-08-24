@@ -12,6 +12,17 @@ const nextConfig: NextConfig = {
    * serveur au lieu d'être empaqueté par le bundler.
    */
   serverExternalPackages: ["better-sqlite3"],
+
+  /**
+   * `src/db/index.ts` calcule le chemin de la base avec `process.cwd()`. Le
+   * traceur de Next résout cette expression sur le disque au moment du build
+   * et embarque donc `data/portfolio.db` — le portefeuille réel — dans
+   * `.next/standalone`. On l'exclut pour toutes les routes : la base est
+   * montée en volume à l'exécution, jamais copiée dans le build.
+   */
+  outputFileTracingExcludes: {
+    "*": ["./data/**"],
+  },
 };
 
 export default nextConfig;
