@@ -1,0 +1,282 @@
+@import "tailwindcss";
+
+/* ==========================================================================
+   Patrimoine — design tokens
+   Dark, editorial, premium. Every colour used in the app comes from here.
+   Tailwind v4 (CSS-first, no tailwind.config.js).
+   ========================================================================== */
+
+@theme {
+  /* --- Surfaces -------------------------------------------------------- */
+  --color-canvas: #07070a;
+  --color-surface: #0f0f14;
+  --color-surface-2: #16161e;
+  --color-surface-3: #1e1e28;
+
+  /* --- Hairlines ------------------------------------------------------- */
+  --color-hairline: rgba(255, 255, 255, 0.07);
+  --color-hairline-strong: rgba(255, 255, 255, 0.12);
+
+  /* --- Ink ------------------------------------------------------------- */
+  --color-ink: #f4f4f7;
+  --color-ink-muted: #9a9aab;
+  --color-ink-faint: #61616f;
+
+  /* --- Accent ---------------------------------------------------------- */
+  --color-accent: #7c5cff;
+  --color-accent-soft: #a78bfa;
+  --color-accent-dim: rgba(124, 92, 255, 0.14);
+
+  /* --- Semantic performance colours ------------------------------------ */
+  --color-positive: #2ed3a7;
+  --color-positive-dim: rgba(46, 211, 167, 0.14);
+  --color-negative: #ff5a6e;
+  --color-negative-dim: rgba(255, 90, 110, 0.14);
+
+  /* --- Categorical palette (allocation donut, stacked areas) ------------
+     Harmonious, desaturated enough to sit calmly on near-black.          */
+  --color-chart-1: #7c5cff; /* violet     */
+  --color-chart-2: #8e9df5; /* periwinkle */
+  --color-chart-3: #e983b4; /* pink       */
+  --color-chart-4: #3fc9ae; /* teal       */
+  --color-chart-5: #e3b168; /* amber      */
+  --color-chart-6: #5c97e8; /* blue       */
+  --color-chart-7: #ec8a7c; /* rose       */
+  --color-chart-8: #a9c96b; /* lime       */
+
+  /* --- Radii ----------------------------------------------------------- */
+  --radius-card: 1rem;
+
+  /* --- Elevation ------------------------------------------------------- */
+  --shadow-elevated: 0 1px 0 0 rgba(255, 255, 255, 0.04) inset,
+    0 8px 24px -12px rgba(0, 0, 0, 0.9);
+  --shadow-accent: 0 1px 0 0 rgba(255, 255, 255, 0.14) inset,
+    0 6px 18px -8px rgba(124, 92, 255, 0.55);
+  --shadow-popover: 0 16px 48px -16px rgba(0, 0, 0, 0.85),
+    0 0 0 1px rgba(255, 255, 255, 0.05);
+
+  /* --- Motion ---------------------------------------------------------- */
+  --animate-overlay-in: overlay-in 180ms cubic-bezier(0.16, 1, 0.3, 1);
+  --animate-overlay-out: overlay-out 140ms cubic-bezier(0.4, 0, 1, 1);
+  --animate-panel-in: panel-in 200ms cubic-bezier(0.16, 1, 0.3, 1);
+  --animate-panel-out: panel-out 140ms cubic-bezier(0.4, 0, 1, 1);
+  --animate-pop-in: pop-in 140ms cubic-bezier(0.16, 1, 0.3, 1);
+  --animate-pop-out: pop-out 110ms cubic-bezier(0.4, 0, 1, 1);
+  --animate-shimmer: shimmer 1.8s ease-in-out infinite;
+}
+
+/* Font token is wired to next/font (see src/app/layout.tsx). */
+@theme inline {
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+    "Liberation Mono", monospace;
+}
+
+/* --------------------------------------------------------------------------
+   Keyframes
+   -------------------------------------------------------------------------- */
+
+@keyframes overlay-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes overlay-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.975);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes panel-out {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(4px) scale(0.985);
+  }
+}
+
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes pop-out {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+}
+
+@keyframes shimmer {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 0.9;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Custom utilities
+   -------------------------------------------------------------------------- */
+
+/* Tabular figures — every number in this app must use it so digits
+   don't jitter as values update. */
+@utility tnum {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+/* Hairline ring helper used by cards / popovers. */
+@utility ring-hairline {
+  box-shadow: 0 0 0 1px var(--color-hairline);
+}
+
+/* --------------------------------------------------------------------------
+   Base layer
+   -------------------------------------------------------------------------- */
+
+@layer base {
+  * {
+    border-color: var(--color-hairline);
+  }
+
+  html {
+    background-color: var(--color-canvas);
+    color: var(--color-ink);
+    color-scheme: dark;
+    overscroll-behavior-y: none;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: var(--color-canvas);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    overscroll-behavior-y: none;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Headings lean tight and editorial. */
+  h1,
+  h2,
+  h3,
+  h4 {
+    letter-spacing: -0.02em;
+  }
+
+  ::selection {
+    background-color: rgba(124, 92, 255, 0.32);
+    color: var(--color-ink);
+    text-shadow: none;
+  }
+
+  /* Firefox */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.14) transparent;
+  }
+
+  /* WebKit */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background-color: rgba(255, 255, 255, 0.12);
+    border-radius: 9999px;
+    border: 3px solid transparent;
+    background-clip: content-box;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(255, 255, 255, 0.22);
+  }
+
+  ::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+
+  /* Numeric inputs should never show spinners. */
+  input[type="number"]::-webkit-outer-spin-button,
+  input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+
+  input[type="number"] {
+    -moz-appearance: textfield;
+    appearance: textfield;
+  }
+
+  :focus-visible {
+    outline: none;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Reduced motion
+   -------------------------------------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    animation-delay: 0ms !important;
+    transition-duration: 0.001ms !important;
+    transition-delay: 0ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Défilement horizontal sans barre visible — utilisé par les rangées
+   d'onglets et le sélecteur de période, trop larges sur mobile. */
+@utility scrollbar-none {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
