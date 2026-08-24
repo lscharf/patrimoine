@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { RefreshButton } from "@/components/refresh-button";
+import { UserMenu } from "@/components/auth/user-menu";
+import { getSession } from "@/server/auth/session";
 import { cn } from "@/lib/utils";
 
 const NAV = [
@@ -8,7 +10,8 @@ const NAV = [
   { href: "/transactions", label: "Transactions" },
 ];
 
-export function SiteHeader({ active = "/" }: { active?: string }) {
+export async function SiteHeader({ active = "/" }: { active?: string }) {
+  const session = await getSession();
   return (
     <header className="sticky top-0 z-40 border-b border-hairline bg-canvas/80 backdrop-blur-xl">
       <div className="mx-auto flex h-14 max-w-6xl items-center gap-3 px-4 sm:gap-6 sm:px-6">
@@ -43,8 +46,14 @@ export function SiteHeader({ active = "/" }: { active?: string }) {
           ))}
         </nav>
 
-        <div className="shrink-0">
+        <div className="flex shrink-0 items-center gap-0.5">
           <RefreshButton />
+          {session?.user && (
+            <UserMenu
+              email={session.user.email}
+              name={session.user.name ?? undefined}
+            />
+          )}
         </div>
       </div>
     </header>

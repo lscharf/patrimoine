@@ -479,9 +479,14 @@ async function buildIntradaySeries(
 
 export async function buildHistory(
   range: Range,
-  opts: { accountId?: number; holdingId?: number; liveTotal: number },
+  opts: {
+    userId: string;
+    accountId?: number;
+    holdingId?: number;
+    liveTotal: number;
+  },
 ): Promise<HistorySeries> {
-  const { holdings: all } = loadPortfolio();
+  const { holdings: all } = loadPortfolio(opts.userId);
 
   const scoped = all.filter((h) => {
     if (opts.holdingId != null) return h.id === opts.holdingId;

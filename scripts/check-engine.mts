@@ -1,9 +1,21 @@
 import { buildSnapshot } from "../src/server/portfolio/snapshot";
 import { buildHistory } from "../src/server/portfolio/history";
-import { sqlite } from "../src/db";
+import { db, sqlite } from "../src/db";
+import { accounts, authUser } from "../src/db/schema";
+
+// Le moteur est cloisonné par utilisateur : on prend le premier compte
+// existant, ou à défaut le premier utilisateur enregistré.
+const owner =
+  db.select({ id: accounts.userId }).from(accounts).get()?.id ??
+  db.select({ id: authUser.id }).from(authUser).get()?.id;
+if (!owner) {
+  console.error("Aucun utilisateur ni portefeuille en base. Lancez d'abord `npm run auth:user`.");
+  sqlite.close();
+  process.exit(1);
+}
 
 const t0 = Date.now();
-const s = await buildSnapshot();
+const s = await buildSnapshot(owner);
 console.log(`SNAPSHOT (${Date.now() - t0} ms)`);
 console.log(`  Total ................ ${s.totalValue.toFixed(2)} €`);
 console.log(`  Prix de revient ...... ${s.totalCostBasis.toFixed(2)} €`);
@@ -27,7 +39,7 @@ for (const a of s.accounts) console.log(`   ${a.name.padEnd(28)} ${a.value.toFix
 console.log("\nHISTORIQUE");
 for (const r of ["1J", "7J", "1M", "3M", "6M", "YTD", "1A", "TOUT"] as const) {
   const t = Date.now();
-  const h = await buildHistory(r, { liveTotal: s.totalValue });
+  const h = await buildHistory(r, { userId: owner, liveTotal: s.totalValue });
   const d = Date.now() - t;
   const first = h.points[0], last = h.points.at(-1);
   console.log(

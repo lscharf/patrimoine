@@ -4,6 +4,7 @@ import { asc, desc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { accounts, holdings, instruments, manualValues, transactions } from "@/db/schema";
 import type { ManualValue, Transaction } from "@/db/schema";
+import { requireUserId } from "./auth/session";
 import { buildSnapshot } from "./portfolio/snapshot";
 import { buildHistory } from "./portfolio/history";
 import type {
@@ -17,8 +18,8 @@ import type {
  * `cache()` déduplique l'appel sur toute la durée d'un rendu : le tableau, le
  * graphique et l'entête consomment le même instantané sans le recalculer.
  */
-export const getSnapshot = cache(
-  async (): Promise<PortfolioSnapshot> => buildSnapshot(),
+export const getSnapshot = cache(async (): Promise<PortfolioSnapshot> =>
+  buildSnapshot(await requireUserId()),
 );
 
 export const getHistory = cache(
@@ -34,13 +35,23 @@ export const getHistory = cache(
           ? (snapshot.accounts.find((a) => a.id === opts.accountId)?.value ?? 0)
           : snapshot.totalValue;
 
-    return buildHistory(range, { ...opts, liveTotal });
+    return buildHistory(range, {
+      ...opts,
+      userId: await requireUserId(),
+      liveTotal,
+    });
   },
 );
 
-export const getAccounts = cache(async () =>
-  db.select().from(accounts).orderBy(accounts.position, accounts.id).all(),
-);
+export const getAccounts = cache(async () => {
+  const userId = await requireUserId();
+  return db
+    .select()
+    .from(accounts)
+    .where(eq(accounts.userId, userId))
+    .orderBy(accounts.position, accounts.id)
+    .all();
+});
 
 export type HoldingDetail = {
   holding: HoldingSnapshot;
@@ -51,6 +62,8 @@ export type HoldingDetail = {
 export const getHoldingDetail = cache(
   async (id: number): Promise<HoldingDetail | null> => {
     const snapshot = await getSnapshot();
+    // L'instantané ne contient que les lignes de l'utilisateur : ne pas la
+    // trouver ici vaut refus, y compris si l'identifiant existe ailleurs.
     const holding = snapshot.holdings.find((h) => h.id === id);
     if (!holding) return null;
 
@@ -72,9 +85,10 @@ export const getHoldingDetail = cache(
   },
 );
 
-/** Toutes les transactions du portefeuille, les plus récentes d'abord. */
-export const getRecentTransactions = cache(async (limit = 40) =>
-  db
+/** Toutes les transactions de l'utilisateur, les plus récentes d'abord. */
+export const getRecentTransactions = cache(async (limit = 40) => {
+  const userId = await requireUserId();
+  return db
     .select({
       tx: transactions,
       holdingLabel: holdings.label,
@@ -88,10 +102,11 @@ export const getRecentTransactions = cache(async (limit = 40) =>
     .innerJoin(holdings, eq(transactions.holdingId, holdings.id))
     .innerJoin(accounts, eq(holdings.accountId, accounts.id))
     .leftJoin(instruments, eq(holdings.instrumentId, instruments.id))
+    .where(eq(accounts.userId, userId))
     .orderBy(desc(transactions.date), desc(transactions.id))
     .limit(limit)
-    .all(),
-);
+    .all();
+});
 
 export const getAccountDetail = cache(async (id: number) => {
   const snapshot = await getSnapshot();

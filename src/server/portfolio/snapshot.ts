@@ -1,5 +1,5 @@
 import "server-only";
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import {
   accounts,
@@ -37,22 +37,38 @@ export type LoadedHolding = {
   txs: Transaction[];
 };
 
-/** Charge tout le portefeuille en mémoire — SQLite local, quelques ms. */
-export function loadPortfolio() {
+/**
+ * Charge le portefeuille d'un utilisateur en mémoire — SQLite local, quelques ms.
+ *
+ * Le filtre sur le propriétaire est appliqué aux **trois** requêtes, et non
+ * seulement aux comptes : une jointure oubliée sur les lignes ou les
+ * transactions exposerait les données d'un autre utilisateur.
+ */
+export function loadPortfolio(userId: string) {
   const accountRows = db
     .select()
     .from(accounts)
+    .where(eq(accounts.userId, userId))
     .orderBy(accounts.position, accounts.id)
     .all();
 
   const holdingRows = db
     .select({ h: holdings, i: instruments })
     .from(holdings)
+    .innerJoin(accounts, eq(holdings.accountId, accounts.id))
     .leftJoin(instruments, eq(holdings.instrumentId, instruments.id))
+    .where(eq(accounts.userId, userId))
     .orderBy(holdings.position, holdings.id)
     .all();
 
-  const txRows = db.select().from(transactions).all();
+  const txRows = db
+    .select({ t: transactions })
+    .from(transactions)
+    .innerJoin(holdings, eq(transactions.holdingId, holdings.id))
+    .innerJoin(accounts, eq(holdings.accountId, accounts.id))
+    .where(eq(accounts.userId, userId))
+    .all()
+    .map((r) => r.t);
   const txByHolding = new Map<number, Transaction[]>();
   for (const tx of txRows) {
     const list = txByHolding.get(tx.holdingId);
@@ -75,11 +91,16 @@ export function loadPortfolio() {
 }
 
 /** Dernière valorisation saisie pour une ligne non cotée. */
-export function latestManualValue(holdingId: number): number | null {
+export function latestManualValue(
+  holdingId: number,
+  userId: string,
+): number | null {
   const row = db
     .select({ value: manualValues.value })
     .from(manualValues)
-    .where(eq(manualValues.holdingId, holdingId))
+    .innerJoin(holdings, eq(manualValues.holdingId, holdings.id))
+    .innerJoin(accounts, eq(holdings.accountId, accounts.id))
+    .where(and(eq(manualValues.holdingId, holdingId), eq(accounts.userId, userId)))
     .orderBy(desc(manualValues.date))
     .limit(1)
     .get();
@@ -122,8 +143,8 @@ export function makeFxOn(currency: string, spot: number) {
   return (date: string) => fxRateOn(cur, date) ?? spot;
 }
 
-export async function buildSnapshot(): Promise<PortfolioSnapshot> {
-  const { accounts: accountRows, holdings: loaded } = loadPortfolio();
+export async function buildSnapshot(userId: string): Promise<PortfolioSnapshot> {
+  const { accounts: accountRows, holdings: loaded } = loadPortfolio(userId);
 
   const instrumentIds = [
     ...new Set(
@@ -172,7 +193,7 @@ export async function buildSnapshot(): Promise<PortfolioSnapshot> {
     } else {
       // Non coté : la dernière valorisation saisie fait foi ; à défaut, on
       // retombe sur les versements cumulés.
-      const manual = latestManualValue(h.id);
+      const manual = latestManualValue(h.id, userId);
       value = (manual ?? basis.costLocal) * spot;
     }
 
