@@ -74,7 +74,7 @@ export default async function DashboardPage({
             history={history}
             range={range}
           />
-          <aside className="rounded-card border border-hairline bg-surface p-5 sm:p-6">
+          <aside className="min-w-0 rounded-card border border-hairline bg-surface p-5 sm:p-6">
             <AllocationPanel
               byHolding={byHolding}
               byAccount={byAccount}
@@ -97,7 +97,12 @@ export default async function DashboardPage({
               <Link href="/comptes">Gérer les comptes</Link>
             </Button>
           </div>
-          <HoldingsTable holdings={snapshot.holdings} total={snapshot.totalValue} />
+          <HoldingsTable
+            holdings={snapshot.holdings}
+            periodChanges={history.byHolding}
+            rangeLabel={range}
+            total={snapshot.totalValue}
+          />
         </section>
       </main>
     </>

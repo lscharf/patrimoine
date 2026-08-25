@@ -39,6 +39,9 @@ export const getHistory = cache(
       ...opts,
       userId: await requireUserId(),
       liveTotal,
+      // Valeur courante de chaque ligne : évite de recalculer la clôture du
+      // jour alors que l'instantané dispose déjà du cours temps réel.
+      liveValues: new Map(snapshot.holdings.map((h) => [h.id, h.value])),
     });
   },
 );

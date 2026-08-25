@@ -98,6 +98,8 @@ export default async function AccountPage({
           </h2>
           <HoldingsTable
             holdings={account.holdings}
+            periodChanges={history.byHolding}
+            rangeLabel={range}
             total={account.value}
             showAccount={false}
             emptyLabel="Ce compte ne contient encore aucune ligne."

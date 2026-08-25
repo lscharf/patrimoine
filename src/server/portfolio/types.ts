@@ -104,6 +104,16 @@ export type PortfolioSnapshot = {
 /** Point de la courbe : timestamp epoch ms, valeur en euros */
 export type SeriesPoint = { t: number; v: number };
 
+/** Variation d'une ligne sur la période affichée, apports déduits. */
+export type HoldingPeriodChange = {
+  holdingId: number;
+  startValue: number;
+  endValue: number;
+  netFlows: number;
+  change: number;
+  changePct: number | null;
+};
+
 export type HistorySeries = {
   range: Range;
   points: SeriesPoint[];
@@ -115,6 +125,12 @@ export type HistorySeries = {
   change: number;
   changePct: number | null;
   isIntraday: boolean;
+  /**
+   * Même calcul, ligne par ligne. Calculé dans la même passe que la courbe :
+   * reconstruire l'historique douze fois, une fois par ligne, coûterait
+   * douze fois le travail pour le même résultat.
+   */
+  byHolding: HoldingPeriodChange[];
 };
 
 /** Libellé long de chaque fenêtre, pour la phrase « … sur 1 mois ». */
