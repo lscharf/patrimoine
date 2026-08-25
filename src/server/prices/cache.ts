@@ -13,6 +13,21 @@ const QUOTE_TTL_MS = 60_000;
 /** Marge avant la date demandée, pour avoir une clôture à reporter en amont. */
 const BACKFILL_PAD_DAYS = 10;
 
+/**
+ * Délai minimal entre deux sollicitations du fournisseur pour l'historique
+ * d'un même instrument.
+ *
+ * La fraîcheur ne peut pas se juger sur un calendrier : une place européenne
+ * n'a rien publié de neuf depuis vendredi, et la juger « périmée » le mardi
+ * conduit à la réinterroger à chaque affichage sans jamais rien obtenir de
+ * plus. On borne donc la fréquence des tentatives, indépendamment de l'état
+ * du cache.
+ */
+const HISTORY_RECHECK_MS = 60 * 60_000;
+
+/** L'intraday a un pas de 5 minutes : le rafraîchir plus souvent est vain. */
+const INTRADAY_TTL_MS = 5 * 60_000;
+
 export const BASE_CURRENCY = "EUR";
 
 function addDays(iso: string, n: number): string {
@@ -136,10 +151,20 @@ export async function ensureDailyHistory(
   const cachedMin = bounds?.min ?? null;
   const cachedMax = bounds?.max ?? null;
 
-  // Trois jours de tolérance : week-ends et jours fériés n'ont pas de barre.
-  const staleTail = !cachedMax || cachedMax < addDays(today(), -3);
-  const missingHead = !cachedMin || padded < cachedMin;
-  if (!staleTail && !missingHead) return;
+  // Un trou en amont est un vrai manque : la fenêtre demandée remonte plus loin
+  // que ce qu'on possède, il faut aller le chercher tout de suite.
+  // On ne redemande en amont que si la fenêtre remonte plus loin que ce qu'on
+  // a *déjà réclamé*. Comparer à la plus ancienne barre reçue ne suffit pas :
+  // quand le fournisseur ne remonte pas aussi loin, l'écart ne se comble
+  // jamais et la requête se répéterait indéfiniment.
+  const missingHead =
+    !cachedMin ||
+    (padded < cachedMin && (!instrument.historyFrom || padded < instrument.historyFrom));
+  const staleTail = !cachedMax || cachedMax < addDays(today(), -1);
+  const checkedRecently =
+    (instrument.historyCheckedAt ?? 0) > Date.now() - HISTORY_RECHECK_MS;
+
+  if (!missingHead && (!staleTail || checkedRecently)) return;
 
   const start = missingHead ? padded : addDays(cachedMax!, -5);
   try {
@@ -148,14 +173,21 @@ export async function ensureDailyHistory(
       new Date(`${start}T00:00:00`),
     );
     upsertBars(instrument.id, bars);
-    const last = bars.at(-1)?.date;
-    if (last) {
-      db.update(instruments)
-        .set({ historyThrough: last })
-        .where(eq(instruments.id, instrument.id))
-        .run();
-    }
+    db.update(instruments)
+      .set({
+        historyThrough: bars.at(-1)?.date ?? instrument.historyThrough,
+        historyCheckedAt: Date.now(),
+        historyFrom: earliestOf(instrument.historyFrom, start),
+      })
+      .where(eq(instruments.id, instrument.id))
+      .run();
   } catch (err) {
+    // La tentative est horodatée même en échec : un fournisseur indisponible
+    // ne doit pas déclencher une rafale de reprises à chaque affichage.
+    db.update(instruments)
+      .set({ historyCheckedAt: Date.now(), historyFrom: earliestOf(instrument.historyFrom, start) })
+      .where(eq(instruments.id, instrument.id))
+      .run();
     console.warn(`[prices] historique ${instrument.symbol} indisponible :`, err);
   }
 }
@@ -189,16 +221,33 @@ export function lastCloseBefore(
   return row?.close ?? null;
 }
 
+/**
+ * Cache mémoire de l'intraday.
+ *
+ * Contrairement aux clôtures, ces points ne sont pas stockés en base : ils sont
+ * volumineux, éphémères, et ne servent qu'aux fenêtres 1J et 7J. Un cache de
+ * processus suffit et évite huit requêtes à chaque bascule de période.
+ */
+const intradayCache = new Map<string, { at: number; ticks: Tick[] }>();
+
 export async function intraday(
   symbol: string,
   from: Date,
   interval: IntradayInterval = "5m",
 ): Promise<Tick[]> {
+  const key = `${symbol}|${interval}`;
+  const hit = intradayCache.get(key);
+  if (hit && hit.at > Date.now() - INTRADAY_TTL_MS) return hit.ticks;
+
   try {
-    return await provider.intradayHistory(symbol, from, interval);
+    const ticks = await provider.intradayHistory(symbol, from, interval);
+    intradayCache.set(key, { at: Date.now(), ticks });
+    return ticks;
   } catch (err) {
     console.warn(`[prices] intraday ${symbol} indisponible :`, err);
-    return [];
+    // On mémorise l'échec brièvement, pour la même raison que ci-dessus.
+    intradayCache.set(key, { at: Date.now(), ticks: hit?.ticks ?? [] });
+    return hit?.ticks ?? [];
   }
 }
 
@@ -260,9 +309,17 @@ export async function ensureFxHistory(
     .get();
 
   const padded = addDays(from, -BACKFILL_PAD_DAYS);
-  const staleTail = !bounds?.max || bounds.max < addDays(today(), -3);
-  const missingHead = !bounds?.min || padded < bounds.min;
-  if (!staleTail && !missingHead) return;
+  const state = db.select().from(fxState).where(eq(fxState.pair, pair)).get();
+  const missingHead =
+    !bounds?.min ||
+    (padded < bounds.min && (!state?.historyFrom || padded < state.historyFrom));
+  const staleTail = !bounds?.max || bounds.max < addDays(today(), -1);
+  const checkedRecently =
+    (state?.historyCheckedAt ?? 0) > Date.now() - HISTORY_RECHECK_MS;
+
+  // Même raisonnement que pour les instruments : un marché des changes fermé
+  // le week-end n'a rien de neuf à livrer, inutile de le redemander.
+  if (!missingHead && (!staleTail || checkedRecently)) return;
 
   const start = missingHead ? padded : addDays(bounds!.max!, -5);
   try {
@@ -281,9 +338,40 @@ export async function ensureFxHistory(
           .run();
       }
     });
+    markFxChecked(pair, start, bars.at(-1)?.date);
   } catch (err) {
+    markFxChecked(pair, start);
     console.warn(`[fx] historique ${pair} indisponible :`, err);
   }
+}
+
+/** Horodate la tentative, qu'elle ait ramené des barres ou non. */
+function markFxChecked(pair: string, requestedFrom: string, through?: string) {
+  const existing = db.select().from(fxState).where(eq(fxState.pair, pair)).get();
+  const from = earliestOf(existing?.historyFrom, requestedFrom);
+  db.insert(fxState)
+    .values({
+      pair,
+      rate: existing?.rate ?? 1,
+      updatedAt: existing?.updatedAt ?? 0,
+      historyThrough: through ?? existing?.historyThrough ?? null,
+      historyCheckedAt: Date.now(),
+      historyFrom: from,
+    })
+    .onConflictDoUpdate({
+      target: fxState.pair,
+      set: {
+        historyCheckedAt: Date.now(),
+        historyFrom: from,
+        ...(through ? { historyThrough: through } : {}),
+      },
+    })
+    .run();
+}
+
+/** La plus ancienne de deux dates ISO, en tolérant les valeurs absentes. */
+function earliestOf(a: string | null | undefined, b: string): string {
+  return a && a < b ? a : b;
 }
 
 export function readFxBars(currency: string, from: string): Bar[] {

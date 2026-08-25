@@ -60,6 +60,22 @@ export const instruments = sqliteTable(
     lastPriceAt: integer("last_price_at"),
     /** Dernière date couverte par le cache d'historique (YYYY-MM-DD) */
     historyThrough: text("history_through"),
+    /**
+     * Dernière **tentative** de complétion de l'historique, epoch ms.
+     *
+     * Distinct de `historyThrough` : une place peut n'avoir rien publié de
+     * nouveau depuis vendredi. Sans cette date, on la resolliciterait à
+     * chaque affichage sans jamais rien obtenir de plus.
+     */
+    historyCheckedAt: integer("history_checked_at"),
+    /**
+     * Date la plus ancienne déjà **demandée** au fournisseur (YYYY-MM-DD).
+     *
+     * Distincte de la plus ancienne barre reçue : si l'on réclame 2020 et que
+     * le fournisseur ne remonte qu'à 2021, l'écart persiste indéfiniment. Sans
+     * cette borne, on redemanderait la même chose à chaque affichage.
+     */
+    historyFrom: text("history_from"),
 
     createdAt: integer("created_at")
       .notNull()
@@ -176,8 +192,13 @@ export const fxBars = sqliteTable(
 export const fxState = sqliteTable("fx_state", {
   pair: text("pair").primaryKey(),
   rate: real("rate").notNull(),
+  /** Dernier rafraîchissement du taux courant, epoch ms */
   updatedAt: integer("updated_at").notNull(),
   historyThrough: text("history_through"),
+  /** Dernière tentative de complétion de l'historique — voir `instruments` */
+  historyCheckedAt: integer("history_checked_at"),
+  /** Date la plus ancienne déjà demandée — voir `instruments` */
+  historyFrom: text("history_from"),
 });
 
 export * from "./auth-schema";

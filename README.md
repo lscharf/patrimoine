@@ -173,6 +173,38 @@ longues sont rééchantillonnées par l'algorithme *Largest Triangle Three
 Buckets*, qui préserve pics et creux là où un échantillonnage régulier les
 gommerait.
 
+## Politique de cache des cours
+
+Le fournisseur est une API publique non contractuelle : le solliciter à chaque
+affichage exposerait à un blocage. Trois mécanismes distincts, selon la nature
+de la donnée.
+
+| Donnée | Stockage | Fréquence maximale |
+|---|---|---|
+| Cours du jour | colonne `instruments.last_price` | 1 requête **groupée** par minute, tous instruments confondus |
+| Clôtures quotidiennes | table `price_bars` | 1 requête par instrument et par heure |
+| Intraday (1J, 7J) | cache mémoire | 1 requête par instrument toutes les 5 minutes |
+| Taux de change | `fx_state` + `fx_bars` | mêmes règles que ci-dessus |
+
+En régime établi, naviguer entre les périodes ne déclenche **aucune requête**.
+
+### Deux pièges que ce cache doit éviter
+
+**La fraîcheur ne se juge pas sur un calendrier.** Un ETF Euronext consulté un
+mardi a sa dernière clôture au vendredi précédent : le déclarer « périmé »
+conduirait à le réinterroger à chaque affichage sans jamais rien obtenir de
+plus, la place n'ayant pas encore publié. D'où `instruments.history_checked_at`,
+qui borne la fréquence des tentatives indépendamment de l'état du cache.
+
+**Un fournisseur ne remonte pas indéfiniment.** Réclamer l'historique depuis
+2020 alors qu'il ne couvre que 2021 laisse un écart permanent entre la fenêtre
+demandée et les données reçues. D'où `history_from`, qui mémorise la date la
+plus ancienne **déjà demandée** : on ne redemande en amont que si l'on veut
+réellement remonter plus loin qu'auparavant.
+
+Ces deux garde-fous existent parce que leur absence a été mesurée : six
+requêtes superflues à chaque affichage, indéfiniment.
+
 ## Changer de fournisseur de cours
 
 Tout passe par l'interface `PriceProvider` (`src/server/prices/provider.ts`).
