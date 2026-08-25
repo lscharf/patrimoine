@@ -1,12 +1,24 @@
 services:
   patrimoine:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      args:
-        # Reportée telle quelle dans la réponse de /api/health.
-        APP_VERSION: "0.1.0"
-    image: patrimoine:latest
+    # Image publiée par GitHub Actions à chaque fusion sur `main`.
+    # Étiquettes disponibles :
+    #   :latest        dernier état de main
+    #   :main-<sha>    un commit précis, pour épingler ou revenir en arrière
+    #   :1.2.3         une version, si un tag v1.2.3 a été posé
+    image: ghcr.io/lscharf/patrimoine:latest
+
+    # Pour construire localement au lieu de tirer l'image publiée —
+    # développement, ou architecture non couverte par la publication —
+    # décommentez ce bloc. `docker compose up --build` l'emportera alors
+    # sur `image:` ci-dessus.
+    #
+    # build:
+    #   context: .
+    #   dockerfile: Dockerfile
+    #   args:
+    #     # Reportée telle quelle dans la réponse de /api/health.
+    #     APP_VERSION: "0.1.0"
+
     container_name: patrimoine
 
     # Redémarre après un plantage et au démarrage de la machine, mais pas si
