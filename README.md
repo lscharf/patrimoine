@@ -121,11 +121,18 @@ distinction permettrait d'énumérer comptes et identifiants.
 
 ## Déploiement Docker
 
-Voir [docs/docker.md](docs/docker.md). En résumé :
+L'image est publiée sur le registre GitHub à chaque fusion sur `main` :
+`ghcr.io/lscharf/patrimoine`. Sur le serveur, il n'y a donc rien à construire.
 
 ```bash
-cp .env.example .env && docker compose up -d --build
+curl -O https://raw.githubusercontent.com/lscharf/patrimoine/main/docker-compose.yml
+curl -o .env https://raw.githubusercontent.com/lscharf/patrimoine/main/.env.example
+# renseigner .env, puis :
+docker compose up -d
 ```
+
+Voir [docs/docker.md](docs/docker.md) pour le détail — étiquettes disponibles,
+visibilité du paquet, mise à jour et retour arrière.
 
 Les migrations s'appliquent à l'ouverture de la connexion, donc à chaque
 démarrage du conteneur : un volume neuf produit une base complète sans

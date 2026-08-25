@@ -313,3 +313,115 @@ l'hôte.
 | Boucle de redirection à la connexion | `BETTER_AUTH_URL` ne correspond pas à l'URL publique, ou le proxy ne termine pas le TLS. |
 | Page sans style ni interactivité | `.next/static` absent de l'image. |
 | `Cannot find module ... better_sqlite3.node` | Binaire natif absent pour l'architecture : reconstruire sans cache (`docker compose build --no-cache`). |
+
+---
+
+# Registre d'images (GHCR)
+
+L'image est publiée automatiquement sur le registre de conteneurs GitHub à
+`ghcr.io/lscharf/patrimoine`.
+
+**Il n'y a rien à créer au préalable.** Contrairement à Docker Hub, GHCR ne
+demande pas de créer un dépôt : le paquet est provisionné au premier `push`,
+et il apparaît ensuite dans l'onglet *Packages* du profil GitHub.
+
+## Comment ça marche
+
+Le workflow `.github/workflows/docker.yml` se déclenche à chaque fusion sur
+`main`, à chaque tag `vX.Y.Z`, et à la demande depuis l'onglet *Actions*.
+
+Aucun jeton personnel n'est nécessaire pour publier : le `GITHUB_TOKEN` fourni
+automatiquement au workflow suffit, dès lors qu'on lui accorde
+`permissions: packages: write`.
+
+Étiquettes produites :
+
+| Étiquette | Quand | Usage |
+|---|---|---|
+| `:latest` | fusion sur `main` | déploiement continu |
+| `:main-<sha>` | fusion sur `main` | épingler un commit précis, revenir en arrière |
+| `:1.2.3`, `:1.2` | tag `v1.2.3` | s'ancrer sur une version |
+
+Rien n'est publié avant que deux contrôles passent :
+
+1. **Aucune donnée personnelle embarquée** — l'image est inspectée pour
+   vérifier que `/app/data` est vide et qu'aucun `.env`, aucune base SQLite ni
+   le script d'import ne s'y trouvent. `.dockerignore` couvre déjà le cas ; ce
+   garde-fou existe pour qu'une régression future échoue bruyamment plutôt
+   qu'en silence — d'autant que le paquet est public.
+2. **Démarrage à blanc** — le conteneur est réellement lancé, sa sonde de
+   santé interrogée, la page de connexion et la redirection d'une page
+   protégée vérifiées, et la présence de la base confirmée. C'est la seule
+   façon de prouver que le binaire natif de `better-sqlite3` se charge et que
+   les migrations s'appliquent.
+
+## L'étape manuelle : rendre le paquet public
+
+Le paquet hérite de la visibilité du dépôt. Comme celui-ci est privé, la
+première publication crée un paquet **privé**. Le rendre public se fait une
+seule fois, à la main — aucune API ne le fait depuis le workflow :
+
+1. Profil GitHub → onglet **Packages** → `patrimoine`
+2. **Package settings** → *Danger Zone* → **Change visibility** → *Public*
+
+À partir de là, le tirage est anonyme et le serveur n'a besoin d'aucune
+authentification.
+
+> L'image contient le code applicatif compilé, qui devient donc lisible par
+> tous. Elle ne contient en revanche aucune donnée financière : la base vit
+> dans un volume, jamais dans l'image.
+
+Tant que le paquet reste privé, le serveur doit s'authentifier :
+
+```bash
+# Jeton personnel (classique) avec la seule portée read:packages
+echo "$GHCR_TOKEN" | docker login ghcr.io -u lscharf --password-stdin
+```
+
+## Déployer sur le serveur
+
+```bash
+mkdir -p ~/patrimoine && cd ~/patrimoine
+curl -O https://raw.githubusercontent.com/lscharf/patrimoine/main/docker-compose.yml
+curl -o .env https://raw.githubusercontent.com/lscharf/patrimoine/main/.env.example
+```
+
+Renseignez `.env` — au minimum `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL` et
+`AUTH_ALLOWED_EMAILS` — puis :
+
+```bash
+docker compose up -d
+```
+
+Les migrations s'appliquent à l'ouverture de la connexion : un volume neuf
+produit une base complète sans intervention.
+
+Créez ensuite votre compte d'accès :
+
+```bash
+docker compose exec patrimoine node -e "process.exit(0)"   # vérifie que le conteneur répond
+```
+
+> Le compte se crée depuis une copie locale du dépôt (`npm run auth:user`), ou
+> par la connexion OIDC si Authelia est déjà configuré : la première connexion
+> d'une adresse figurant dans `AUTH_ALLOWED_EMAILS` crée le compte.
+
+## Mettre à jour
+
+```bash
+docker compose pull && docker compose up -d
+```
+
+Pour revenir à une version antérieure, remplacez l'étiquette dans
+`docker-compose.yml` par un `:main-<sha>` précis et relancez la même commande.
+
+## En cas de problème
+
+```bash
+docker compose logs -f patrimoine
+```
+
+Un conteneur qui redémarre en boucle vient presque toujours d'un `.env`
+incomplet : `BETTER_AUTH_SECRET` absent ou inférieur à 32 caractères fait
+échouer le démarrage volontairement, plutôt que de laisser tourner
+l'application avec une clé de session devinable.
