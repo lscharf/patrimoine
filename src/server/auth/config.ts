@@ -1,4 +1,5 @@
 import "server-only";
+import { randomBytes } from "node:crypto";
 import { betterAuth } from "better-auth";
 import { APIError } from "better-auth/api";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
@@ -20,15 +21,39 @@ import {
 
 const isProduction = process.env.NODE_ENV === "production";
 
+/**
+ * `next build` évalue les modules serveur pour collecter les métadonnées des
+ * pages. L'image Docker est construite avec `NODE_ENV=production` et **sans**
+ * fichier d'environnement — `.dockerignore` exclut `.env` à dessein, un secret
+ * n'ayant rien à faire dans une image publiée.
+ *
+ * Exiger le secret à ce moment-là reviendrait à en faire une dépendance de
+ * compilation, alors qu'il n'est nécessaire qu'à l'exécution. On distingue
+ * donc les deux phases.
+ */
+const isBuildPhase = process.env.NEXT_PHASE === "phase-production-build";
+
 function requiredSecret(): string {
   const secret = process.env.BETTER_AUTH_SECRET;
   if (secret && secret.length >= 32) return secret;
-  if (isProduction) {
+
+  // À l'exécution, l'absence de secret est fatale : mieux vaut un conteneur
+  // qui refuse de démarrer qu'une application dont les sessions se signent
+  // avec une clé devinable.
+  if (isProduction && !isBuildPhase) {
     throw new Error(
       "BETTER_AUTH_SECRET est absent ou trop court (32 caractères minimum). " +
         "Générez-le avec : openssl rand -base64 32",
     );
   }
+
+  if (isBuildPhase) {
+    // Aucune requête n'est servie pendant la construction : cette valeur ne
+    // signe jamais rien. Elle est tirée au hasard pour qu'un secret de
+    // construction ne puisse pas se retrouver en production par inadvertance.
+    return randomBytes(32).toString("base64");
+  }
+
   // En développement, une clé fixe évite d'invalider la session à chaque
   // redémarrage. Elle n'a aucune valeur de sécurité et le garde ci-dessus
   // interdit qu'elle serve en production.
