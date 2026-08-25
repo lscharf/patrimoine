@@ -19,9 +19,12 @@ export function PortfolioSummary({
 }) {
   const trend = deltaTrend(history.change);
 
+  // `min-w-0` sur la section : sans lui, un enfant de grille conserve
+  // `min-width: auto` et refuse de descendre sous la largeur de son contenu,
+  // ce qui pousse la page hors de l'écran sur mobile.
   return (
-    <section className="rounded-card border border-hairline bg-surface p-5 sm:p-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
+    <section className="min-w-0 rounded-card border border-hairline bg-surface p-5 sm:p-6">
+      <div className="flex min-w-0 flex-wrap items-start justify-between gap-4">
         <div>
           <p className="text-xs font-medium uppercase tracking-wider text-ink-faint">
             {title}
@@ -50,7 +53,7 @@ export function PortfolioSummary({
         </div>
 
         {/* Huit périodes ne tiennent pas sur 375 px : on laisse défiler. */}
-        <div className="-mx-1 w-full overflow-x-auto px-1 scrollbar-none sm:mx-0 sm:w-auto sm:px-0">
+        <div className="-mx-1 w-full max-w-full overflow-x-auto px-1 scrollbar-none sm:mx-0 sm:w-auto sm:px-0">
           <RangeSelector value={range} />
         </div>
       </div>

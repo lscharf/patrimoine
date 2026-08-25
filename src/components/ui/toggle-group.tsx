@@ -26,9 +26,10 @@ const toggleGroupItemVariants = cva(
   {
     variants: {
       size: {
-        sm: "h-6 px-2 text-[11px]",
-        md: "h-7 px-2.5 text-[12px]",
-        lg: "h-9 px-3.5 text-[13px]",
+        sm: "h-6 px-1.5 text-[11px] sm:px-2",
+        // Huit plages doivent tenir sur 390 px : on resserre sous `sm`.
+        md: "h-7 px-1.5 text-[11px] sm:px-2.5 sm:text-[12px]",
+        lg: "h-9 px-3 text-[12px] sm:px-3.5 sm:text-[13px]",
       },
     },
     defaultVariants: { size: "md" },

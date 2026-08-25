@@ -20,7 +20,12 @@ import {
   prepareFx,
   type LoadedHolding,
 } from "./snapshot";
-import type { HistorySeries, Range, SeriesPoint } from "./types";
+import type {
+  HistorySeries,
+  HoldingPeriodChange,
+  Range,
+  SeriesPoint,
+} from "./types";
 
 /** Au-delà, la courbe est rééchantillonnée : l'écran n'a pas plus de pixels. */
 const MAX_POINTS = 420;
@@ -203,6 +208,37 @@ function lttb(points: SeriesPoint[], threshold: number): SeriesPoint[] {
   return sampled;
 }
 
+/**
+ * Applique aux lignes le même calcul que pour le total : valeur de fin, moins
+ * valeur de début, moins les apports de la période. Un achat en cours de
+ * fenêtre ne doit pas apparaître comme une performance.
+ */
+function buildByHolding(
+  scoped: LoadedHolding[],
+  bounds: Map<number, { start: number; end: number }>,
+  liveValues: Map<number, number>,
+  from: string,
+  to: string,
+  fxOnFor: (h: LoadedHolding) => (date: string) => number,
+): HoldingPeriodChange[] {
+  return scoped.map((h) => {
+    const b = bounds.get(h.id) ?? { start: 0, end: 0 };
+    // Le cours temps réel est plus frais que la dernière clôture connue.
+    const endValue = liveValues.get(h.id) ?? b.end;
+    const netFlows = netFlowsBetween(h.txs, from, to, fxOnFor(h));
+    const change = endValue - b.start - netFlows;
+    const base = b.start + Math.max(netFlows, 0);
+    return {
+      holdingId: h.id,
+      startValue: b.start,
+      endValue,
+      netFlows,
+      change,
+      changePct: base > 0 ? change / base : null,
+    };
+  });
+}
+
 /* ------------------------------------------------------------------ *
  * Courbe journalière
  * ------------------------------------------------------------------ */
@@ -212,6 +248,7 @@ async function buildDailySeries(
   scoped: LoadedHolding[],
   earliest: string,
   liveTotal: number,
+  liveValues: Map<number, number>,
 ): Promise<HistorySeries> {
   const from = windowStart(range, earliest);
   const to = today();
@@ -257,6 +294,10 @@ async function buildDailySeries(
   }
 
   const totals = new Float64Array(grid.length);
+  const last = grid.length - 1;
+  // Valeur de chaque ligne aux deux bornes de la fenêtre, relevée au passage.
+  const bounds = new Map<number, { start: number; end: number }>();
+
   for (const h of scoped) {
     const cur = h.currency.toUpperCase();
     const fx = fxSeries.get(cur);
@@ -268,11 +309,19 @@ async function buildDailySeries(
       for (let g = 0; g < grid.length; g++) {
         totals[g] += qty[g] * prices[g] * (fx ? fx[g] : 1);
       }
+      bounds.set(h.id, {
+        start: qty[0] * prices[0] * (fx ? fx[0] : 1),
+        end: qty[last] * prices[last] * (fx ? fx[last] : 1),
+      });
     } else {
       const values = manualTimeline(h.id, h.txs, grid);
       for (let g = 0; g < grid.length; g++) {
         totals[g] += values[g] * (fx ? fx[g] : 1);
       }
+      bounds.set(h.id, {
+        start: values[0] * (fx ? fx[0] : 1),
+        end: values[last] * (fx ? fx[last] : 1),
+      });
     }
   }
 
@@ -297,6 +346,8 @@ async function buildDailySeries(
   const change = endValue - startValue - netFlows;
   const base = startValue + Math.max(netFlows, 0);
 
+  const byHolding = buildByHolding(scoped, bounds, liveValues, from, to, fxOnFor);
+
   return {
     range,
     points: lttb(points, MAX_POINTS),
@@ -306,6 +357,7 @@ async function buildDailySeries(
     change,
     changePct: base > 0 ? change / base : null,
     isIntraday: false,
+    byHolding,
   };
 }
 
@@ -343,6 +395,7 @@ function emptySeries(range: Range, liveTotal: number): HistorySeries {
     change: 0,
     changePct: null,
     isIntraday: true,
+    byHolding: [],
   };
 }
 
@@ -350,6 +403,7 @@ async function buildIntradaySeries(
   range: IntradayRange,
   scoped: LoadedHolding[],
   liveTotal: number,
+  liveValues: Map<number, number>,
 ): Promise<HistorySeries> {
   const { lookbackMs, interval, fetchDays } = INTRADAY_WINDOWS[range];
   const spot = await prepareFx(scoped);
@@ -405,10 +459,14 @@ async function buildIntradaySeries(
   );
 
   const totals = new Float64Array(timeline.length);
+  const lastIdx = timeline.length - 1;
+  const bounds = new Map<number, { start: number; end: number }>();
 
   for (const h of scoped) {
     const fx = spot.get(h.currency.toUpperCase()) ?? 1;
     const qtyByDate = quantityTimeline(h.txs, gridDates);
+    let firstContribution = 0;
+    let lastContribution = 0;
 
     if (h.kind === "QUOTED" && h.instrument) {
       const ticks = (ticksByInstrument.get(h.instrument.id) ?? []).filter(
@@ -426,16 +484,23 @@ async function buildIntradaySeries(
           carried = ticks[i].close;
           i++;
         }
-        totals[g] += qtyByDate[tickDateIdx[g]] * carried * fx;
+        const contribution = qtyByDate[tickDateIdx[g]] * carried * fx;
+        totals[g] += contribution;
+        if (g === 0) firstContribution = contribution;
+        if (g === lastIdx) lastContribution = contribution;
       }
     } else {
       // Une ligne non cotée ne bouge pas dans la journée : contribution plate,
       // mais elle suit tout de même les versements de la période.
       const values = manualTimeline(h.id, h.txs, gridDates);
       for (let g = 0; g < timeline.length; g++) {
-        totals[g] += values[tickDateIdx[g]] * fx;
+        const contribution = values[tickDateIdx[g]] * fx;
+        totals[g] += contribution;
+        if (g === 0) firstContribution = contribution;
+        if (g === lastIdx) lastContribution = contribution;
       }
     }
+    bounds.set(h.id, { start: firstContribution, end: lastContribution });
   }
 
   if (liveTotal > 0) totals[totals.length - 1] = liveTotal;
@@ -461,6 +526,15 @@ async function buildIntradaySeries(
   const change = endValue - startValue - netFlows;
   const base = startValue + Math.max(netFlows, 0);
 
+  const byHolding = buildByHolding(
+    scoped,
+    bounds,
+    liveValues,
+    isoDate(new Date(cutoff)),
+    isoDate(new Date(maxT)),
+    fxOnFor,
+  );
+
   return {
     range,
     points: lttb(points, MAX_POINTS),
@@ -470,6 +544,7 @@ async function buildIntradaySeries(
     change,
     changePct: base > 0 ? change / base : null,
     isIntraday: true,
+    byHolding,
   };
 }
 
@@ -484,6 +559,8 @@ export async function buildHistory(
     accountId?: number;
     holdingId?: number;
     liveTotal: number;
+    /** Valeur actuelle de chaque ligne, en euros — plus fraîche que la clôture. */
+    liveValues?: Map<number, number>;
   },
 ): Promise<HistorySeries> {
   const { holdings: all } = loadPortfolio(opts.userId);
@@ -509,10 +586,12 @@ export async function buildHistory(
       change: 0,
       changePct: null,
       isIntraday: isIntradayRange(range),
+      byHolding: [],
     };
   }
 
+  const liveValues = opts.liveValues ?? new Map<number, number>();
   return isIntradayRange(range)
-    ? buildIntradaySeries(range, scoped, opts.liveTotal)
-    : buildDailySeries(range, scoped, earliest, opts.liveTotal);
+    ? buildIntradaySeries(range, scoped, opts.liveTotal, liveValues)
+    : buildDailySeries(range, scoped, earliest, opts.liveTotal, liveValues);
 }
