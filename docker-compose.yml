@@ -1,0 +1,91 @@
+services:
+  patrimoine:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        # Reportée telle quelle dans la réponse de /api/health.
+        APP_VERSION: "0.1.0"
+    image: patrimoine:latest
+    container_name: patrimoine
+
+    # Redémarre après un plantage et au démarrage de la machine, mais pas si
+    # le conteneur a été arrêté à la main (`docker compose stop`).
+    restart: unless-stopped
+
+    # Secrets et configuration lus depuis .env, jamais depuis l'image.
+    # Copier .env.example vers .env avant le premier démarrage.
+    env_file:
+      - .env
+
+    ports:
+      # Publication sur la boucle locale UNIQUEMENT, jamais sur 0.0.0.0.
+      #
+      # L'application parle du HTTP en clair et n'a aucune notion de TLS. Elle
+      # doit impérativement se trouver derrière un reverse proxy qui termine le
+      # TLS, pour deux raisons concrètes :
+      #   - les cookies de session sont marqués Secure : un navigateur les
+      #     refuse purement et simplement sur une origine http://, donc la
+      #     connexion échoue en boucle ;
+      #   - les URL de rappel OIDC d'Authelia sont enregistrées en https:// et
+      #     doivent correspondre exactement, sinon la redirection est rejetée.
+      #
+      # Exposer ce port sur 0.0.0.0 publierait le patrimoine en clair sur le
+      # réseau et court-circuiterait l'authentification du proxy.
+      - "127.0.0.1:3000:3000"
+
+    volumes:
+      # Volume nommé : la base survit à `docker compose down` et à toute
+      # reconstruction de l'image. Son propriétaire est initialisé depuis
+      # l'image (uid 1000 / node), voir le RUN chown du Dockerfile.
+      - patrimoine-data:/app/data
+
+    # Durcissement léger : l'application n'a jamais besoin d'élever ses droits.
+    security_opt:
+      - no-new-privileges:true
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    # ---------------------------------------------------------------------
+    # EXEMPLE (désactivé) — rattachement à un reverse proxy existant
+    # ---------------------------------------------------------------------
+    # Si un proxy tourne déjà sur cette machine dans son propre réseau Docker,
+    # il est préférable de ne plus publier de port du tout et de laisser le
+    # proxy joindre le conteneur par le réseau interne. Retirer alors le bloc
+    # `ports:` ci-dessus et décommenter :
+    #
+    # networks:
+    #   - proxy
+    #
+    # Les libellés ci-dessous sont donnés à titre d'ILLUSTRATION, avec la
+    # syntaxe de Traefik. Ils ne présument pas du proxy réellement utilisé :
+    # avec Caddy, nginx-proxy ou une configuration nginx écrite à la main, la
+    # déclaration se fait ailleurs et ces libellés sont simplement ignorés.
+    # L'important est que le proxy termine le TLS et transmette les en-têtes
+    # X-Forwarded-Proto / X-Forwarded-Host.
+    #
+    # labels:
+    #   - "traefik.enable=true"
+    #   - "traefik.docker.network=proxy"
+    #   - "traefik.http.routers.patrimoine.rule=Host(`patrimoine.example.com`)"
+    #   - "traefik.http.routers.patrimoine.entrypoints=websecure"
+    #   - "traefik.http.routers.patrimoine.tls.certresolver=letsencrypt"
+    #   - "traefik.http.services.patrimoine.loadbalancer.server.port=3000"
+    #   # Authelia en garde d'accès devant l'application, si le middleware
+    #   # correspondant est déjà défini côté proxy :
+    #   - "traefik.http.routers.patrimoine.middlewares=authelia@docker"
+
+volumes:
+  patrimoine-data:
+
+# Réseau externe du proxy — à décommenter en même temps que le bloc `networks`
+# du service. « external: true » signifie que le réseau existe déjà et n'est ni
+# créé ni supprimé par ce fichier :
+#
+# networks:
+#   proxy:
+#     external: true

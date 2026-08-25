@@ -1,6 +1,7 @@
 import "server-only";
 import Database from "better-sqlite3";
 import { drizzle } from "drizzle-orm/better-sqlite3";
+import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import path from "node:path";
 import fs from "node:fs";
 import * as schema from "./schema";
@@ -17,12 +18,40 @@ const globalForDb = globalThis as unknown as {
   __sqlite?: Database.Database;
 };
 
+/**
+ * Applique les migrations en attente au démarrage du serveur.
+ *
+ * C'est le seul moment où elles peuvent l'être en conteneur : l'image
+ * d'exécution ne contient ni `tsx` ni `drizzle-kit`, et la commande de
+ * démarrage est un simple `node server.js`. Sans cela, un volume neuf
+ * donnerait une base vide et la première requête échouerait.
+ *
+ * L'opération est idempotente — Drizzle tient un journal des migrations
+ * appliquées — et coûte quelques millisecondes lorsqu'il n'y a rien à faire.
+ */
+function runMigrations(connection: Database.Database) {
+  const folder = path.join(process.cwd(), "drizzle");
+  if (!fs.existsSync(folder)) {
+    console.warn(
+      `[db] dossier de migrations introuvable (${folder}) — schéma non vérifié.`,
+    );
+    return;
+  }
+  try {
+    migrate(drizzle(connection), { migrationsFolder: folder });
+  } catch (err) {
+    console.error("[db] échec des migrations :", err);
+    throw err;
+  }
+}
+
 function createConnection() {
   fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
   const sqlite = new Database(DB_PATH);
   sqlite.pragma("journal_mode = WAL");
   sqlite.pragma("foreign_keys = ON");
   sqlite.pragma("busy_timeout = 5000");
+  runMigrations(sqlite);
   return sqlite;
 }
 

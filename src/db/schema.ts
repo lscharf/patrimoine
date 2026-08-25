@@ -1,4 +1,5 @@
 import { sql } from "drizzle-orm";
+import { authUser } from "./auth-schema";
 import {
   index,
   integer,
@@ -14,6 +15,16 @@ import {
  * ------------------------------------------------------------------ */
 export const accounts = sqliteTable("accounts", {
   id: integer("id").primaryKey({ autoIncrement: true }),
+  /**
+   * Propriétaire du compte. Nullable au niveau SQL uniquement pour permettre
+   * la migration des portefeuilles créés avant l'authentification : ils sont
+   * rattachés au premier utilisateur qui se connecte. En lecture, toutes les
+   * requêtes filtrent strictement sur l'utilisateur de la session — une ligne
+   * orpheline n'est donc jamais visible.
+   */
+  userId: text("user_id").references(() => authUser.id, {
+    onDelete: "cascade",
+  }),
   name: text("name").notNull(),
   /** PEA | CTO | PEE | AV | LIVRET | CRYPTO | OTHER */
   kind: text("kind").notNull().default("CTO"),
@@ -168,6 +179,8 @@ export const fxState = sqliteTable("fx_state", {
   updatedAt: integer("updated_at").notNull(),
   historyThrough: text("history_through"),
 });
+
+export * from "./auth-schema";
 
 export type Account = typeof accounts.$inferSelect;
 export type Instrument = typeof instruments.$inferSelect;

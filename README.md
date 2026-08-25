@@ -37,6 +37,104 @@ npm run seed -- --reset
 - **Performance nette des apports.** Un versement de 500 € n'est pas compté
   comme un gain de 500 €. C'est l'erreur la plus courante des suivis maison.
 
+## Authentification
+
+L'application est protégée dès le premier démarrage. Deux moyens de connexion
+cohabitent :
+
+- **Mot de passe local**, créé en ligne de commande — accès de secours.
+- **OIDC**, testé avec Authelia — le moyen normal une fois l'application exposée.
+
+### Mise en route
+
+```bash
+cp .env.example .env
+openssl rand -base64 32   # à coller dans BETTER_AUTH_SECRET
+```
+
+Renseignez au minimum `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL` et
+`AUTH_ALLOWED_EMAILS`, puis créez votre compte :
+
+```bash
+npm run auth:user
+```
+
+Les comptes du portefeuille créés avant l'authentification sont
+automatiquement rattachés à ce premier utilisateur.
+
+### La liste blanche n'est pas optionnelle
+
+`AUTH_ALLOWED_EMAILS` énumère les adresses autorisées. Le comportement est
+**fermé par défaut** : sans cette variable, aucun compte ne peut être créé et
+aucune connexion n'aboutit.
+
+C'est le point à ne pas négliger avec l'OIDC. Authelia authentifie l'ensemble
+de votre annuaire ; si l'application se contentait de vérifier « cet
+utilisateur est authentifié », **tout compte Authelia accéderait à votre
+portefeuille**. La liste blanche est ce second filtre. Elle est vérifiée à la
+création du compte *et* à chaque ouverture de session : retirer une adresse
+suffit à couper l'accès, sans toucher à la base.
+
+### Configurer Authelia
+
+Déclarez un client dans `identity_providers.oidc.clients` :
+
+```yaml
+- client_id: patrimoine
+  client_name: Patrimoine
+  client_secret: '$pbkdf2-sha512$310000$...'   # le hash, pas le secret
+  public: false
+  authorization_policy: two_factor
+  require_pkce: true
+  pkce_challenge_method: S256
+  redirect_uris:
+    - https://votre-domaine/api/auth/callback/authelia
+  scopes: [openid, profile, email]
+  token_endpoint_auth_method: client_secret_basic
+```
+
+L'URI de redirection est `/api/auth/callback/<providerId>`. Beaucoup
+d'exemples en circulation indiquent `/api/auth/oauth2/callback/...`, chemin des
+versions antérieures de Better Auth : il produit une erreur
+`redirect_uri mismatch` peu explicite.
+
+L'adresse comparée à la liste blanche est celle transmise par Authelia dans le
+jeton d'identité, qui n'est pas toujours celle attendue.
+
+### Comment la protection est construite
+
+Trois couches, volontairement redondantes :
+
+1. **Middleware** — vérifie la présence du cookie de session. Il tourne sur le
+   runtime Edge, ne peut pas interroger SQLite, et ne constitue donc qu'un
+   raccourci d'ergonomie, jamais une barrière.
+2. **Lectures** — `requireUserId()` valide la session en base ; toutes les
+   requêtes filtrent sur le propriétaire.
+3. **Écritures** — chaque server action vérifie la session puis la propriété de
+   l'objet touché, en remontant la chaîne ligne → compte → utilisateur. Sans ce
+   contrôle, un identifiant numérique deviné suffirait à supprimer les données
+   d'autrui.
+
+Les messages d'erreur ne distinguent pas « n'existe pas » de « ne vous
+appartient pas », et « adresse inconnue » de « mot de passe incorrect » : cette
+distinction permettrait d'énumérer comptes et identifiants.
+
+## Déploiement Docker
+
+Voir [docs/docker.md](docs/docker.md). En résumé :
+
+```bash
+cp .env.example .env && docker compose up -d --build
+```
+
+Les migrations s'appliquent à l'ouverture de la connexion, donc à chaque
+démarrage du conteneur : un volume neuf produit une base complète sans
+intervention.
+
+Le port n'est délibérément publié que sur `127.0.0.1`. Les cookies sécurisés et
+les redirections OIDC exigent HTTPS : l'application doit être placée derrière
+un proxy inverse assurant la terminaison TLS.
+
 ## Architecture
 
 ```
@@ -86,6 +184,7 @@ seconde implémentation et à modifier la ligne d'import dans
 | `npm run db:reset` | Vide le portefeuille en conservant le cache de cours |
 | `npm run db:studio` | Explorateur de base Drizzle |
 | `npm run check:engine` | Vérifie valorisation et historique en console |
+| `npm run auth:user` | Crée le compte d'accès (mot de passe saisi masqué) |
 
 ## Données
 

@@ -1,0 +1,1 @@
+ALTER TABLE `auth_account` ADD `issuer` text NOT NULL;

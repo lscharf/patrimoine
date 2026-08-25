@@ -11,6 +11,13 @@ import {
   manualValues,
   transactions,
 } from "@/db/schema";
+import { currentUserId } from "@/server/auth/session";
+import {
+  ownsAccount,
+  ownsHolding,
+  ownsManualValue,
+  ownsTransaction,
+} from "@/server/auth/ownership";
 import { ensureInstrument } from "@/server/prices/cache";
 import { yahooProvider } from "@/server/prices/yahoo";
 import type { SearchHit } from "@/server/prices/provider";
@@ -29,6 +36,14 @@ export type ActionResult<T = void> =
 function fail(error: string, fieldErrors?: Record<string, string>) {
   return { ok: false as const, error, fieldErrors };
 }
+
+const UNAUTHORIZED = "Session expirée. Reconnectez-vous.";
+/**
+ * Message volontairement identique pour « n'existe pas » et « ne vous
+ * appartient pas » : distinguer les deux permettrait d'énumérer les
+ * identifiants d'autrui.
+ */
+const FORBIDDEN = "Cet élément est introuvable.";
 
 function fromZod(err: z.ZodError) {
   const fieldErrors: Record<string, string> = {};
@@ -58,6 +73,9 @@ function nextPosition(table: typeof accounts | typeof holdings) {
 export async function searchInstruments(
   query: string,
 ): Promise<ActionResult<SearchHit[]>> {
+  const userId = await currentUserId();
+  if (!userId) return fail(UNAUTHORIZED);
+
   const q = query.trim();
   if (q.length < 2) return { ok: true, data: [] };
 
@@ -110,6 +128,9 @@ const PALETTE = [
 ];
 
 export async function createAccount(raw: unknown): Promise<ActionResult<number>> {
+  const userId = await currentUserId();
+  if (!userId) return fail(UNAUTHORIZED);
+
   const parsed = accountInput.safeParse(raw);
   if (!parsed.success) return fromZod(parsed.error);
   const { name, kind, institution, color } = parsed.data;
@@ -117,6 +138,7 @@ export async function createAccount(raw: unknown): Promise<ActionResult<number>>
   const position = nextPosition(accounts);
   db.insert(accounts)
     .values({
+      userId,
       name,
       kind,
       institution: institution || null,
@@ -139,6 +161,10 @@ export async function updateAccount(
   id: number,
   raw: unknown,
 ): Promise<ActionResult> {
+  const userId = await currentUserId();
+  if (!userId) return fail(UNAUTHORIZED);
+  if (!ownsAccount(userId, id)) return fail(FORBIDDEN);
+
   const parsed = accountInput.partial().safeParse(raw);
   if (!parsed.success) return fromZod(parsed.error);
   const { name, kind, institution, color } = parsed.data;
@@ -157,6 +183,10 @@ export async function updateAccount(
 }
 
 export async function deleteAccount(id: number): Promise<ActionResult> {
+  const userId = await currentUserId();
+  if (!userId) return fail(UNAUTHORIZED);
+  if (!ownsAccount(userId, id)) return fail(FORBIDDEN);
+
   // Les lignes et transactions partent en cascade (ON DELETE CASCADE).
   db.delete(accounts).where(eq(accounts.id, id)).run();
   refresh();
@@ -170,10 +200,15 @@ export async function deleteAccount(id: number): Promise<ActionResult> {
 export async function createQuotedHolding(
   raw: unknown,
 ): Promise<ActionResult<number>> {
+  const userId = await currentUserId();
+  if (!userId) return fail(UNAUTHORIZED);
+
   const parsed = quotedHoldingInput.safeParse(raw);
   if (!parsed.success) return fromZod(parsed.error);
   const { accountId, symbol, label, date, quantity, unitPrice, fees } =
     parsed.data;
+
+  if (!ownsAccount(userId, accountId)) return fail(FORBIDDEN);
 
   let instrument;
   try {
@@ -221,9 +256,14 @@ export async function createQuotedHolding(
 export async function createManualHolding(
   raw: unknown,
 ): Promise<ActionResult<number>> {
+  const userId = await currentUserId();
+  if (!userId) return fail(UNAUTHORIZED);
+
   const parsed = manualHoldingInput.safeParse(raw);
   if (!parsed.success) return fromZod(parsed.error);
   const { accountId, label, date, amount, value } = parsed.data;
+
+  if (!ownsAccount(userId, accountId)) return fail(FORBIDDEN);
 
   const position = nextPosition(holdings);
   db.insert(holdings)
@@ -254,6 +294,10 @@ export async function updateHolding(
   id: number,
   raw: unknown,
 ): Promise<ActionResult> {
+  const userId = await currentUserId();
+  if (!userId) return fail(UNAUTHORIZED);
+  if (!ownsHolding(userId, id)) return fail(FORBIDDEN);
+
   const parsed = z
     .object({
       label: z.string().trim().min(1).max(80).optional(),
@@ -274,6 +318,10 @@ export async function updateHolding(
 }
 
 export async function deleteHolding(id: number): Promise<ActionResult> {
+  const userId = await currentUserId();
+  if (!userId) return fail(UNAUTHORIZED);
+  if (!ownsHolding(userId, id)) return fail(FORBIDDEN);
+
   db.delete(holdings).where(eq(holdings.id, id)).run();
   refresh();
   return { ok: true };
@@ -284,16 +332,14 @@ export async function deleteHolding(id: number): Promise<ActionResult> {
  * ------------------------------------------------------------------ */
 
 export async function addTransaction(raw: unknown): Promise<ActionResult> {
+  const userId = await currentUserId();
+  if (!userId) return fail(UNAUTHORIZED);
+
   const parsed = transactionInput.safeParse(raw);
   if (!parsed.success) return fromZod(parsed.error);
   const v = parsed.data;
 
-  const holding = db
-    .select()
-    .from(holdings)
-    .where(eq(holdings.id, v.holdingId))
-    .get();
-  if (!holding) return fail("Ligne introuvable.");
+  if (!ownsHolding(userId, v.holdingId)) return fail(FORBIDDEN);
 
   db.insert(transactions)
     .values({
@@ -316,6 +362,10 @@ export async function updateTransaction(
   id: number,
   raw: unknown,
 ): Promise<ActionResult> {
+  const userId = await currentUserId();
+  if (!userId) return fail(UNAUTHORIZED);
+  if (!ownsTransaction(userId, id)) return fail(FORBIDDEN);
+
   const parsed = transactionInput.safeParse(raw);
   if (!parsed.success) return fromZod(parsed.error);
   const v = parsed.data;
@@ -338,6 +388,10 @@ export async function updateTransaction(
 }
 
 export async function deleteTransaction(id: number): Promise<ActionResult> {
+  const userId = await currentUserId();
+  if (!userId) return fail(UNAUTHORIZED);
+  if (!ownsTransaction(userId, id)) return fail(FORBIDDEN);
+
   db.delete(transactions).where(eq(transactions.id, id)).run();
   refresh();
   return { ok: true };
@@ -348,9 +402,14 @@ export async function deleteTransaction(id: number): Promise<ActionResult> {
  * ------------------------------------------------------------------ */
 
 export async function setManualValue(raw: unknown): Promise<ActionResult> {
+  const userId = await currentUserId();
+  if (!userId) return fail(UNAUTHORIZED);
+
   const parsed = manualValueInput.safeParse(raw);
   if (!parsed.success) return fromZod(parsed.error);
   const { holdingId, date, value } = parsed.data;
+
+  if (!ownsHolding(userId, holdingId)) return fail(FORBIDDEN);
 
   db.insert(manualValues)
     .values({ holdingId, date, value })
@@ -365,6 +424,10 @@ export async function setManualValue(raw: unknown): Promise<ActionResult> {
 }
 
 export async function deleteManualValue(id: number): Promise<ActionResult> {
+  const userId = await currentUserId();
+  if (!userId) return fail(UNAUTHORIZED);
+  if (!ownsManualValue(userId, id)) return fail(FORBIDDEN);
+
   db.delete(manualValues).where(eq(manualValues.id, id)).run();
   refresh();
   return { ok: true };
@@ -376,6 +439,9 @@ export async function deleteManualValue(id: number): Promise<ActionResult> {
 
 /** Force le rafraîchissement des cours au prochain rendu. */
 export async function invalidateQuotes(): Promise<ActionResult> {
+  const userId = await currentUserId();
+  if (!userId) return fail(UNAUTHORIZED);
+
   db.update(instruments).set({ lastPriceAt: 0 }).run();
   refresh();
   return { ok: true };

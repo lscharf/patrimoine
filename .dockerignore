@@ -1,0 +1,62 @@
+# ---------------------------------------------------------------------------
+# Contexte de build Docker — tout ce qui est listé ici n'est jamais envoyé au
+# démon, donc jamais tracé par Next ni copié dans l'image.
+# ---------------------------------------------------------------------------
+
+# Dépendances : réinstallées proprement par `npm ci` (arch Linux, pas macOS).
+node_modules
+**/node_modules
+.npm
+
+# Artefacts de build locaux : l'étape `builder` régénère tout.
+.next
+out
+build
+*.tsbuildinfo
+next-env.d.ts
+
+# Données personnelles — CRITIQUE.
+# La base contient le portefeuille réel. Sans cette exclusion, le traçage de
+# Next embarque `data/portfolio.db` dans `.next/standalone/` (comportement
+# observé sur ce projet), donc directement dans l'image.
+data
+**/*.db
+**/*.db-wal
+**/*.db-shm
+
+# Secrets : jamais dans une couche d'image, tout passe par des variables
+# d'environnement au démarrage.
+.env
+.env.*
+!.env.example
+
+# Positions financières réelles en clair.
+scripts/import-portefeuille.ts
+
+# Contrôle de version et métadonnées d'outillage.
+.git
+.gitignore
+.github
+.claude
+.vscode
+.idea
+.DS_Store
+**/.DS_Store
+
+# Docker lui-même : inutile à l'intérieur de l'image.
+Dockerfile
+.dockerignore
+docker-compose.yml
+docker-compose.*.yml
+
+# Documentation.
+docs
+README.md
+AGENTS.md
+CLAUDE.md
+
+# Journaux.
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
