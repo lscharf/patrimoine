@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Group } from "@visx/group";
 import { Pie } from "@visx/shape";
+import { Montant } from "@/components/privacy/amount";
 import { formatCurrency, formatPercent } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -95,7 +96,9 @@ export function AllocationDonut({ slices, total, size = 220, className }: Props)
 
       <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center px-6 text-center">
         <div className="tnum text-lg font-semibold tracking-tight text-ink">
-          {formatCurrency(hovered ? hovered.value : total, "EUR", { compact: size < 200 })}
+          <Montant>
+            {formatCurrency(hovered ? hovered.value : total, "EUR", { compact: size < 200 })}
+          </Montant>
         </div>
         <div className="mt-0.5 max-w-full truncate text-xs text-ink-muted">
           {hovered ? hovered.label : "Total"}

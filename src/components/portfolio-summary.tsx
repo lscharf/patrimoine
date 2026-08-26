@@ -2,6 +2,7 @@ import { PortfolioChart } from "@/components/chart/portfolio-chart";
 import { DeltaBadge, deltaTrend } from "@/components/delta-badge";
 import { RangeSelector } from "@/components/range-selector";
 import { SimpleTooltip } from "@/components/ui";
+import { Montant } from "@/components/privacy/amount";
 import { formatCurrency } from "@/lib/format";
 import { RANGE_LABELS, type HistorySeries, type Range } from "@/server/portfolio/types";
 import { Info } from "lucide-react";
@@ -30,7 +31,7 @@ export function PortfolioSummary({
             {title}
           </p>
           <p className="tnum mt-2 text-4xl font-semibold tracking-tight text-ink sm:text-5xl">
-            {formatCurrency(total)}
+            <Montant>{formatCurrency(total)}</Montant>
           </p>
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <DeltaBadge value={history.change} pct={history.changePct} />

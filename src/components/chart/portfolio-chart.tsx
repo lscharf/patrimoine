@@ -9,6 +9,7 @@ import { AreaClosed, LinePath } from "@visx/shape";
 import { scaleLinear, scaleTime } from "@visx/scale";
 import { localPoint } from "@visx/event";
 import { cn } from "@/lib/utils";
+import { Montant } from "@/components/privacy/amount";
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/format";
 import type { SeriesPoint } from "@/server/portfolio/types";
 
@@ -232,7 +233,7 @@ function Chart({
           style={{ left: labelX, width: labelWidth }}
         >
           <div className="tnum text-sm font-semibold text-ink">
-            {formatCurrency(active.v)}
+            <Montant>{formatCurrency(active.v)}</Montant>
           </div>
           <div className="tnum text-[11px] text-ink-faint">
             {intraday ? formatDateTime(active.t) : formatDate(active.t)}

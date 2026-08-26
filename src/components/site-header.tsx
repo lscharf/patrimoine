@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { RefreshButton } from "@/components/refresh-button";
 import { UserMenu } from "@/components/auth/user-menu";
+import { PrivacyToggle } from "@/components/privacy/privacy-toggle";
+import { COOKIE_MASQUE } from "@/lib/privacy";
+import { cookies } from "next/headers";
 import { getSession } from "@/server/auth/session";
 import { cn } from "@/lib/utils";
 
@@ -12,6 +15,7 @@ const NAV = [
 
 export async function SiteHeader({ active = "/" }: { active?: string }) {
   const session = await getSession();
+  const masque = (await cookies()).get(COOKIE_MASQUE)?.value === "1";
   return (
     <header className="sticky top-0 z-40 border-b border-hairline bg-canvas/80 backdrop-blur-xl">
       <div className="mx-auto flex h-14 max-w-6xl items-center gap-2 px-3 sm:gap-6 sm:px-6">
@@ -49,7 +53,10 @@ export async function SiteHeader({ active = "/" }: { active?: string }) {
         </nav>
 
         <div className="flex shrink-0 items-center gap-0.5">
-          <RefreshButton />
+          <PrivacyToggle initial={masque} />
+          {/* Sous `sm`, l'action rejoint le menu utilisateur : quatre boutons
+              ne tiennent pas avec les trois onglets de navigation. */}
+          <RefreshButton className="hidden sm:inline-flex" />
           {session?.user && (
             <UserMenu
               email={session.user.email}

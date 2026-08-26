@@ -1,5 +1,6 @@
 import { ArrowDownRight, ArrowUpRight } from "lucide-react";
 import { Badge } from "@/components/ui";
+import { Montant } from "@/components/privacy/amount";
 import { formatPercent, formatSignedCurrency } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -31,9 +32,13 @@ export function DeltaBadge({ value, pct, pctOnly, className }: Props) {
       className={cn("tnum gap-0.5", className)}
       icon={trend !== "flat" ? <Icon className="size-3" aria-hidden /> : undefined}
     >
-      {pctOnly
-        ? formatPercent(pct, { signed: true })
-        : formatSignedCurrency(value)}
+      {/* Seul le montant est masquable : le pourcentage reste lisible, c'est
+          tout l'intérêt de pouvoir montrer son écran. */}
+      {pctOnly ? (
+        formatPercent(pct, { signed: true })
+      ) : (
+        <Montant>{formatSignedCurrency(value)}</Montant>
+      )}
       {!pctOnly && pct != null && (
         <span className="ml-1 opacity-60">{formatPercent(pct, { signed: true })}</span>
       )}
