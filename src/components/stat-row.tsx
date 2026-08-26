@@ -1,3 +1,4 @@
+import { Montant } from "@/components/privacy/amount";
 import { SimpleTooltip } from "@/components/ui";
 import { formatCurrency, formatPercent } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -6,11 +7,14 @@ import type { PortfolioSnapshot } from "@/server/portfolio/types";
 function Stat({
   label,
   value,
+  apres,
   hint,
   tone = "neutral",
 }: {
   label: string;
   value: string;
+  /** Rendu hors du masque : sert au pourcentage, qui reste lisible. */
+  apres?: string;
   hint?: string;
   tone?: "neutral" | "positive" | "negative";
 }) {
@@ -27,7 +31,8 @@ function Stat({
           tone === "neutral" && "text-ink",
         )}
       >
-        {value}
+        <Montant>{value}</Montant>
+        {apres && <span className="text-ink-muted">{apres}</span>}
       </p>
     </div>
   );
@@ -58,7 +63,8 @@ export function StatRow({ snapshot }: { snapshot: PortfolioSnapshot }) {
       />
       <Stat
         label="+/- value latente"
-        value={`${formatCurrency(snapshot.unrealizedPL)} · ${formatPercent(
+        value={formatCurrency(snapshot.unrealizedPL)}
+        apres={` · ${formatPercent(
           snapshot.unrealizedPLPct,
         )}`}
         tone={tone(snapshot.unrealizedPL)}

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { AllocationDonut, type Slice } from "@/components/chart/allocation-donut";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui";
+import { Montant } from "@/components/privacy/amount";
 import { formatCurrency, formatPercent } from "@/lib/format";
 
 type Props = {
@@ -53,7 +54,7 @@ export function AllocationPanel({ byHolding, byAccount, total }: Props) {
             />
             <span className="min-w-0 flex-1 truncate text-ink-muted">{s.label}</span>
             <span className="tnum shrink-0 text-xs text-ink-faint">
-              {formatCurrency(s.value, "EUR", { compact: true })}
+              <Montant>{formatCurrency(s.value, "EUR", { compact: true })}</Montant>
             </span>
             <span className="tnum w-12 shrink-0 text-right text-ink">
               {formatPercent(total > 0 ? s.value / total : 0)}
@@ -70,7 +71,7 @@ export function AllocationPanel({ byHolding, byAccount, total }: Props) {
               {hidden.length} autre{hidden.length > 1 ? "s" : ""}
             </span>
             <span className="tnum shrink-0 text-xs text-ink-faint">
-              {formatCurrency(hiddenValue, "EUR", { compact: true })}
+              <Montant>{formatCurrency(hiddenValue, "EUR", { compact: true })}</Montant>
             </span>
             <span className="tnum w-12 shrink-0 text-right text-ink">
               {formatPercent(total > 0 ? hiddenValue / total : 0)}

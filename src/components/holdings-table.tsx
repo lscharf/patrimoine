@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowDown, ArrowUp, ChevronRight } from "lucide-react";
+import { Montant } from "@/components/privacy/amount";
 import { DeltaBadge } from "@/components/delta-badge";
 import { formatCurrency, formatPercent, formatPrice, formatQuantity } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -236,14 +237,17 @@ export function HoldingsTable({
                       {showAccount && <span className="truncate">{h.accountName}</span>}
                       {h.kind === "QUOTED" && h.quantity > 0 && (
                         <span className="tnum hidden truncate lg:inline">
-                          {formatQuantity(h.quantity)} × {formatPrice(h.lastPrice, h.currency)}
+                          <Montant>
+                            {formatQuantity(h.quantity)} ×{" "}
+                            {formatPrice(h.lastPrice, h.currency)}
+                          </Montant>
                         </span>
                       )}
                     </div>
                   </div>
                   {/* Valeur, collée au nom sur mobile pour tenir sur une ligne */}
                   <span className="tnum shrink-0 text-sm font-medium text-ink sm:hidden">
-                    {formatCurrency(h.value)}
+                    <Montant>{formatCurrency(h.value)}</Montant>
                   </span>
                 </div>
 
@@ -267,11 +271,13 @@ export function HoldingsTable({
 
                   <div className="hidden text-right sm:block">
                     <div className="tnum text-sm font-medium text-ink">
-                      {formatCurrency(h.value)}
+                      <Montant>{formatCurrency(h.value)}</Montant>
                     </div>
                     {h.currency !== "EUR" && h.lastPrice != null && (
                       <div className="tnum mt-0.5 text-[11px] text-ink-faint">
-                        {formatCurrency(h.quantity * h.lastPrice, h.currency)}
+                        <Montant>
+                          {formatCurrency(h.quantity * h.lastPrice, h.currency)}
+                        </Montant>
                       </div>
                     )}
                   </div>

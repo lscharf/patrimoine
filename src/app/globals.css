@@ -280,3 +280,32 @@
     display: none;
   }
 }
+
+/* ------------------------------------------------------------------ *
+ * Masquage des montants
+ *
+ * Piloté par `data-montants-masques` sur <html>, posé au rendu serveur à
+ * partir du cookie. Le flou est exprimé en `em` : il suit la taille du texte,
+ * si bien que le total en gros caractères et les chiffres du tableau
+ * paraissent masqués de la même façon.
+ *
+ * Aucune largeur n'est modifiée — la mise en page ne bouge pas d'un pixel à
+ * la bascule, seul le contenu devient illisible.
+ * ------------------------------------------------------------------ */
+[data-montant] {
+  transition: filter 220ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+[data-montants-masques] [data-montant] {
+  filter: blur(0.38em);
+  /* Empêche de récupérer la valeur par sélection ou copier-coller. */
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: default;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-montant] {
+    transition: none;
+  }
+}

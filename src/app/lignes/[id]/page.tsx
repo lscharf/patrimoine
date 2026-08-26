@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Montant } from "@/components/privacy/amount";
 import { notFound } from "next/navigation";
 import { ArrowLeft, Plus, Trash2 } from "lucide-react";
 import {
@@ -25,10 +26,13 @@ import { getHistory, getHoldingDetail } from "@/server/queries";
 function Metric({
   label,
   value,
+  apres,
   tone,
 }: {
   label: string;
   value: string;
+  /** Rendu hors du masque : le pourcentage reste lisible. */
+  apres?: string;
   tone?: "positive" | "negative";
 }) {
   return (
@@ -44,7 +48,8 @@ function Metric({
           !tone && "text-ink",
         )}
       >
-        {value}
+        <Montant>{value}</Montant>
+        {apres && <span className="text-ink-muted">{apres}</span>}
       </p>
     </div>
   );
@@ -141,8 +146,11 @@ export default async function HoldingPage({
                 label="Variation du jour"
                 value={
                   h.dayChange != null
-                    ? `${formatCurrency(h.dayChange)} · ${formatPercent(h.dayChangePct)}`
+                    ? formatCurrency(h.dayChange)
                     : "—"
+                }
+                apres={
+                  h.dayChange != null ? ` · ${formatPercent(h.dayChangePct)}` : undefined
                 }
                 tone={h.dayChange != null ? tone(h.dayChange) : undefined}
               />
@@ -169,7 +177,8 @@ export default async function HoldingPage({
           <Metric label="Investi" value={formatCurrency(h.costBasis)} />
           <Metric
             label="+/- value latente"
-            value={`${formatCurrency(h.unrealizedPL)} · ${formatPercent(h.unrealizedPLPct)}`}
+            value={formatCurrency(h.unrealizedPL)}
+            apres={` · ${formatPercent(h.unrealizedPLPct)}`}
             tone={tone(h.unrealizedPL)}
           />
           <Metric
@@ -194,7 +203,7 @@ export default async function HoldingPage({
                       {formatDate(v.date)}
                     </span>
                     <span className="tnum text-sm font-medium text-ink">
-                      {formatCurrency(v.value)}
+                      {<Montant>{formatCurrency(v.value)}</Montant>}
                     </span>
                   </li>
                 ))}

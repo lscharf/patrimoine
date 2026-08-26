@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Pencil, Trash2 } from "lucide-react";
 import { DeleteConfirm, TransactionDialog } from "@/components/forms";
 import { Button } from "@/components/ui";
+import { Montant } from "@/components/privacy/amount";
 import { formatCurrency, formatDate, formatPrice, formatQuantity } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { deleteTransaction } from "@/server/actions";
@@ -100,9 +101,15 @@ export function TransactionsTable({
                 <div className="mt-0.5 flex items-center gap-2 text-xs text-ink-faint">
                   {isTrade && (
                     <span className="tnum">
-                      {formatQuantity(tx.quantity)} ×{" "}
-                      {formatPrice(tx.unitPrice, currency)}
-                      {tx.fees > 0 && ` · ${formatPrice(tx.fees, currency)} de frais`}
+                      <Montant>{formatQuantity(tx.quantity)}</Montant> ×{" "}
+                      {<Montant>{formatPrice(tx.unitPrice, currency)}</Montant>}
+                      {tx.fees > 0 && (
+                        <>
+                          {" · "}
+                          <Montant>{formatPrice(tx.fees, currency)}</Montant>
+                          {" de frais"}
+                        </>
+                      )}
                     </span>
                   )}
                   {showHolding && accountName && (
@@ -122,7 +129,7 @@ export function TransactionsTable({
               </div>
 
               <span className={cn("tnum shrink-0 text-sm font-medium", amount.tone)}>
-                {formatCurrency(amount.value, currency)}
+                {<Montant>{formatCurrency(amount.value, currency)}</Montant>}
               </span>
 
               <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">

@@ -1,3 +1,4 @@
+import { cookies } from "next/headers";
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import { Toaster } from "sonner";
@@ -5,6 +6,7 @@ import { Toaster } from "sonner";
 import { TooltipProvider } from "@/components/ui";
 
 import "./globals.css";
+import { COOKIE_MASQUE } from "@/lib/privacy";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -24,9 +26,17 @@ export const viewport: Viewport = {
   colorScheme: "dark",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default async function RootLayout({ children }: LayoutProps<"/">) {
+  // Lu au rendu serveur : les montants ne peuvent pas apparaître, même
+  // brièvement, avant que le client ne prenne la main.
+  const masque = (await cookies()).get(COOKIE_MASQUE)?.value === "1";
+
   return (
-    <html lang="fr" className={`dark ${inter.variable} h-full antialiased`}>
+    <html
+      lang="fr"
+      className={`dark ${inter.variable} h-full antialiased`}
+      {...(masque ? { "data-montants-masques": "" } : {})}
+    >
       <body className="bg-canvas text-ink flex min-h-full flex-col font-sans">
         <TooltipProvider>{children}</TooltipProvider>
         <Toaster

@@ -21,6 +21,7 @@ import {
   TabsTrigger,
   Textarea,
 } from "@/components/ui";
+import { Montant } from "@/components/privacy/amount";
 import { formatCurrency } from "@/lib/format";
 import {
   createManualHolding,
@@ -272,7 +273,7 @@ function QuotedForm({
       <div className="bg-surface-2 border-hairline flex items-center justify-between rounded-xl border px-3 py-2.5">
         <span className="text-ink-muted text-[13px]">Montant total</span>
         <span className="tnum text-ink text-sm font-semibold">
-          {formatCurrency(total, currency, { decimals: 2 })}
+          <Montant>{formatCurrency(total, currency, { decimals: 2 })}</Montant>
         </span>
       </div>
 

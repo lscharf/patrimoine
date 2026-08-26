@@ -4,6 +4,7 @@ import { AccountDialog } from "@/components/forms";
 import { DeltaBadge } from "@/components/delta-badge";
 import { SiteHeader } from "@/components/site-header";
 import { Button, EmptyState } from "@/components/ui";
+import { Montant } from "@/components/privacy/amount";
 import { formatCurrency, formatPercent } from "@/lib/format";
 import { ACCOUNT_KIND_LABELS } from "@/server/actions/schemas";
 import { getSnapshot } from "@/server/queries";
@@ -84,7 +85,7 @@ export default async function AccountsPage() {
                   <div className="flex w-full items-center justify-between gap-3 border-t border-hairline pt-3 sm:w-auto sm:border-0 sm:pt-0">
                     <div className="shrink-0 sm:text-right">
                       <p className="tnum text-sm font-medium text-ink">
-                        {formatCurrency(a.value)}
+                        {<Montant>{formatCurrency(a.value)}</Montant>}
                       </p>
                       <p className="tnum mt-0.5 text-xs text-ink-faint">
                         {formatPercent(a.weight)} du total
