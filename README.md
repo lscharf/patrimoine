@@ -1,81 +1,73 @@
 # Patrimoine
 
-Suivi de patrimoine personnel, auto-hébergé. Une alternative locale à Finary :
-comptes, lignes, transactions, cours en temps réel et courbe de performance —
-sans envoyer vos données financières à un tiers.
+Suivi de patrimoine personnel, auto-hébergé. Comptes, lignes, transactions,
+cours de marché automatiques et courbe de performance — sans confier ses
+données financières à un tiers.
 
-## Démarrer
+Image publiée à chaque fusion sur `main` : `ghcr.io/lscharf/patrimoine:latest`.
 
-```bash
-npm install
-npm run dev
-```
+---
 
-L'application est disponible sur http://localhost:3000. La base est créée et
-migrée automatiquement au premier lancement.
+## Déployer avec Docker
 
-Pour explorer l'interface avec un portefeuille fictif :
+### 1. Récupérer les fichiers
 
 ```bash
-npm run seed -- --reset
+mkdir -p ~/patrimoine && cd ~/patrimoine
+curl -O https://raw.githubusercontent.com/lscharf/patrimoine/main/docker-compose.yml
+curl -o .env https://raw.githubusercontent.com/lscharf/patrimoine/main/.env.example
 ```
 
-## Ce que fait l'application
+### 2. Renseigner `.env`
 
-- **Comptes → lignes → transactions.** Une ligne accepte plusieurs achats et
-  ventes : le prix de revient unitaire (PRU) est recalculé en moyenne pondérée
-  à chaque opération, comme le veut la règle fiscale française.
-- **Cours automatiques.** ETF Euronext, actions, cryptomonnaies et devises sont
-  récupérés sans clé d'API. Un cache local évite de solliciter le fournisseur à
-  chaque affichage.
-- **Multi-devises.** Une ligne cotée en dollars est convertie en euros au taux
-  du jour, et son prix de revient au taux qui avait cours le jour de chaque
-  achat — l'effet de change apparaît donc comme une composante réelle de la
-  performance.
-- **Lignes non cotées.** PEE, livrets, parts sociales : versements et
-  valorisations saisis à la main, intégrés à la courbe comme les autres.
-- **Performance nette des apports.** Un versement de 500 € n'est pas compté
-  comme un gain de 500 €. C'est l'erreur la plus courante des suivis maison.
-
-## Authentification
-
-L'application est protégée dès le premier démarrage. Deux moyens de connexion
-cohabitent :
-
-- **Mot de passe local**, créé en ligne de commande — accès de secours.
-- **OIDC**, testé avec Authelia — le moyen normal une fois l'application exposée.
-
-### Mise en route
+Trois variables suffisent pour démarrer :
 
 ```bash
-cp .env.example .env
-openssl rand -base64 32   # à coller dans BETTER_AUTH_SECRET
+BETTER_AUTH_SECRET=      # openssl rand -base64 32
+BETTER_AUTH_URL=         # URL publique, ex. https://patrimoine.exemple.fr
+AUTH_ALLOWED_EMAILS=     # votre adresse
 ```
 
-Renseignez au minimum `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL` et
-`AUTH_ALLOWED_EMAILS`, puis créez votre compte :
+> `AUTH_ALLOWED_EMAILS` n'est pas optionnel : sans lui **aucun compte ne peut
+> être créé ni aucune session ouverte**. Le comportement est fermé par défaut,
+> volontairement.
+
+### 3. Démarrer
+
+```bash
+docker compose up -d
+```
+
+Les migrations s'appliquent au démarrage : un volume neuf produit une base
+complète sans intervention.
+
+### 4. Créer son accès
+
+Avec Authelia branché (voir plus bas), la première connexion d'une adresse
+figurant dans la liste blanche crée le compte. Sinon, depuis une copie locale
+du dépôt pointée sur la même base :
 
 ```bash
 npm run auth:user
 ```
 
-Les comptes du portefeuille créés avant l'authentification sont
-automatiquement rattachés à ce premier utilisateur.
+### Le port n'est pas publié sur toutes les interfaces
 
-### La liste blanche n'est pas optionnelle
+Par défaut le compose écoute sur `127.0.0.1:3000`. L'application parle du HTTP
+en clair et n'a aucune notion de TLS : elle doit se trouver derrière un proxy
+inverse qui termine le chiffrement.
 
-`AUTH_ALLOWED_EMAILS` énumère les adresses autorisées. Le comportement est
-**fermé par défaut** : sans cette variable, aucun compte ne peut être créé et
-aucune connexion n'aboutit.
+**Si votre proxy tourne sur une autre machine**, cette liaison à la boucle
+locale le rendra injoignable. Remplacez-la par l'adresse LAN de l'hôte :
 
-C'est le point à ne pas négliger avec l'OIDC. Authelia authentifie l'ensemble
-de votre annuaire ; si l'application se contentait de vérifier « cet
-utilisateur est authentifié », **tout compte Authelia accéderait à votre
-portefeuille**. La liste blanche est ce second filtre. Elle est vérifiée à la
-création du compte *et* à chaque ouverture de session : retirer une adresse
-suffit à couper l'accès, sans toucher à la base.
+```yaml
+ports:
+  - "192.168.1.99:3000:3000"
+```
 
-### Configurer Authelia
+---
+
+## Connecter Authelia
 
 Déclarez un client dans `identity_providers.oidc.clients` :
 
@@ -88,144 +80,151 @@ Déclarez un client dans `identity_providers.oidc.clients` :
   require_pkce: true
   pkce_challenge_method: S256
   redirect_uris:
-    - https://votre-domaine/api/auth/callback/authelia
+    - https://VOTRE-DOMAINE/api/auth/callback/authelia
   scopes: [openid, profile, email]
-  token_endpoint_auth_method: client_secret_basic
+  token_endpoint_auth_method: client_secret_post
 ```
 
-L'URI de redirection est `/api/auth/callback/<providerId>`. Beaucoup
-d'exemples en circulation indiquent `/api/auth/oauth2/callback/...`, chemin des
-versions antérieures de Better Auth : il produit une erreur
-`redirect_uri mismatch` peu explicite.
-
-L'adresse comparée à la liste blanche est celle transmise par Authelia dans le
-jeton d'identité, qui n'est pas toujours celle attendue.
-
-### Comment la protection est construite
-
-Trois couches, volontairement redondantes :
-
-1. **Middleware** — vérifie la présence du cookie de session. Il tourne sur le
-   runtime Edge, ne peut pas interroger SQLite, et ne constitue donc qu'un
-   raccourci d'ergonomie, jamais une barrière.
-2. **Lectures** — `requireUserId()` valide la session en base ; toutes les
-   requêtes filtrent sur le propriétaire.
-3. **Écritures** — chaque server action vérifie la session puis la propriété de
-   l'objet touché, en remontant la chaîne ligne → compte → utilisateur. Sans ce
-   contrôle, un identifiant numérique deviné suffirait à supprimer les données
-   d'autrui.
-
-Les messages d'erreur ne distinguent pas « n'existe pas » de « ne vous
-appartient pas », et « adresse inconnue » de « mot de passe incorrect » : cette
-distinction permettrait d'énumérer comptes et identifiants.
-
-## Déploiement Docker
-
-L'image est publiée sur le registre GitHub à chaque fusion sur `main` :
-`ghcr.io/lscharf/patrimoine`. Sur le serveur, il n'y a donc rien à construire.
+Générer le secret et son empreinte :
 
 ```bash
-curl -O https://raw.githubusercontent.com/lscharf/patrimoine/main/docker-compose.yml
-curl -o .env https://raw.githubusercontent.com/lscharf/patrimoine/main/.env.example
-# renseigner .env, puis :
-docker compose up -d
+docker run --rm authelia/authelia:latest authelia crypto hash generate pbkdf2 \
+  --variant sha512 --random --random.length 72 --random.charset rfc3986
 ```
 
-Voir [docs/docker.md](docs/docker.md) pour le détail — étiquettes disponibles,
-visibilité du paquet, mise à jour et retour arrière.
+Puis compléter `.env` avec `AUTHELIA_ISSUER`, `AUTHELIA_CLIENT_ID` et
+`AUTHELIA_CLIENT_SECRET`.
 
-Les migrations s'appliquent à l'ouverture de la connexion, donc à chaque
-démarrage du conteneur : un volume neuf produit une base complète sans
-intervention.
+### Trois pièges
 
-Le port n'est délibérément publié que sur `127.0.0.1`. Les cookies sécurisés et
-les redirections OIDC exigent HTTPS : l'application doit être placée derrière
-un proxy inverse assurant la terminaison TLS.
+**L'URI de redirection est `/api/auth/callback/authelia`**, pas
+`/api/auth/oauth2/callback/...`. Ce dernier était le chemin des versions
+antérieures de Better Auth et traîne encore dans beaucoup d'exemples ; il
+produit un `redirect_uri mismatch` peu bavard.
 
-## Architecture
+**`token_endpoint_auth_method` doit valoir `client_secret_post`.** Avec
+`client_secret_basic`, l'échange échoue en `invalid_client`.
 
+**La liste blanche compare l'adresse transmise par Authelia**, qui n'est pas
+forcément celle attendue. Authelia authentifie *tout* votre annuaire : sans ce
+second filtre, chacun de ses utilisateurs accéderait au portefeuille.
+
+---
+
+## Exploiter
+
+```bash
+docker compose pull && docker compose up -d   # mettre à jour
+docker compose logs -f patrimoine             # journaux
 ```
-src/db/            Schéma Drizzle et connexion SQLite
-src/server/
-  prices/          Fournisseur de cours (interface + implémentation Yahoo) et cache
-  portfolio/       Prix de revient, valorisation, reconstruction de l'historique
-  actions/         Mutations (server actions) et validation Zod
-  queries.ts       Lectures pour les composants serveur
-src/components/    Design system, graphiques, tableaux, formulaires
-src/app/           Pages
+
+Pour revenir en arrière, remplacer l'étiquette par un `:main-<sha>` précis.
+
+### Sauvegarder
+
+Les données vivent dans le volume `patrimoine-data`. Copier le seul fichier
+`.db` pendant que le serveur tourne manque les transactions encore dans le
+journal WAL. L'écart n'est pas théorique : sur cette instance, le `.db` vivant
+pèse 4 Ko quand la sauvegarde cohérente en fait 1 044 Ko. Passez donc par
+l'API de sauvegarde de SQLite :
+
+```bash
+docker exec patrimoine node -e "new (require('better-sqlite3'))('/app/data/portfolio.db').backup('/app/data/backup.db')"
+docker cp patrimoine:/app/data/backup.db ./patrimoine-$(date +%F).db
 ```
 
-### Le point délicat : la courbe historique
+Détails complets dans [docs/docker.md](docs/docker.md).
 
-Afficher « 3 mois » ne consiste pas à relire une valeur stockée chaque jour :
-le portefeuille est **reconstruit** date par date. Pour chaque jour de la
-fenêtre, le moteur calcule la quantité détenue à cette date, la multiplie par
-le cours de clôture du jour et par le taux de change du jour, puis additionne
-toutes les lignes.
+---
 
-Conséquence utile : ajouter aujourd'hui un achat daté de l'an dernier corrige
-rétroactivement toute la courbe. Un système à instantanés quotidiens en serait
-incapable.
+## Ce que fait l'application
 
-Les fenêtres `1J` et `7J` passent par des données infra-journalières (pas de
-5 minutes et 1 heure) ; au-delà, la clôture quotidienne suffit. Les courbes
-longues sont rééchantillonnées par l'algorithme *Largest Triangle Three
-Buckets*, qui préserve pics et creux là où un échantillonnage régulier les
-gommerait.
+- **Comptes → lignes → transactions.** Une ligne accepte plusieurs achats,
+  ventes, dividendes et frais ; le prix de revient unitaire est une moyenne
+  pondérée.
+- **Cours automatiques** pour actions, ETF et crypto, via Yahoo Finance.
+- **Lignes non cotées** (PEE, livrets) valorisées à la main.
+- **Multi-devises** : le prix de revient est converti au taux du jour de chaque
+  opération, ce qui isole l'effet de change.
+- **Courbe de performance** de 1 jour à l'origine, avec la variation de chaque
+  ligne sur la période choisie.
+- **Masquage des montants** d'un clic, pour montrer son écran sans dévoiler les
+  sommes.
 
-## Politique de cache des cours
+---
 
-Le fournisseur est une API publique non contractuelle : le solliciter à chaque
-affichage exposerait à un blocage. Trois mécanismes distincts, selon la nature
-de la donnée.
+## Développer en local
 
-| Donnée | Stockage | Fréquence maximale |
-|---|---|---|
-| Cours du jour | colonne `instruments.last_price` | 1 requête **groupée** par minute, tous instruments confondus |
-| Clôtures quotidiennes | table `price_bars` | 1 requête par instrument et par heure |
-| Intraday (1J, 7J) | cache mémoire | 1 requête par instrument toutes les 5 minutes |
-| Taux de change | `fx_state` + `fx_bars` | mêmes règles que ci-dessus |
+```bash
+npm install
+npm run dev
+```
 
-En régime établi, naviguer entre les périodes ne déclenche **aucune requête**.
+La base est créée et migrée au premier lancement. Pour un portefeuille fictif :
 
-### Deux pièges que ce cache doit éviter
+```bash
+npm run seed -- --reset
+```
 
-**La fraîcheur ne se juge pas sur un calendrier.** Un ETF Euronext consulté un
-mardi a sa dernière clôture au vendredi précédent : le déclarer « périmé »
-conduirait à le réinterroger à chaque affichage sans jamais rien obtenir de
-plus, la place n'ayant pas encore publié. D'où `instruments.history_checked_at`,
-qui borne la fréquence des tentatives indépendamment de l'état du cache.
+L'authentification s'applique aussi en local : renseignez au moins
+`AUTH_ALLOWED_EMAILS` dans un fichier `.env`, puis `npm run auth:user`.
 
-**Un fournisseur ne remonte pas indéfiniment.** Réclamer l'historique depuis
-2020 alors qu'il ne couvre que 2021 laisse un écart permanent entre la fenêtre
-demandée et les données reçues. D'où `history_from`, qui mémorise la date la
-plus ancienne **déjà demandée** : on ne redemande en amont que si l'on veut
-réellement remonter plus loin qu'auparavant.
+---
 
-Ces deux garde-fous existent parce que leur absence a été mesurée : six
-requêtes superflues à chaque affichage, indéfiniment.
+## Deux choix d'architecture
 
-## Changer de fournisseur de cours
+Le reste du code est ordinaire ; ces deux points ne le sont pas.
 
-Tout passe par l'interface `PriceProvider` (`src/server/prices/provider.ts`).
-Brancher Twelve Data, CoinGecko ou une autre source revient à écrire une
-seconde implémentation et à modifier la ligne d'import dans
-`src/server/prices/cache.ts`.
+### L'historique est reconstruit, pas enregistré
+
+La courbe n'est pas une suite d'instantanés quotidiens. Elle est recalculée
+date par date : quantité détenue ce jour-là × cours de clôture × taux de change
+du jour. Saisir aujourd'hui une transaction d'il y a six mois corrige donc
+rétroactivement toute la courbe — ce qu'un historique de soldes stockés ne
+permettrait pas.
+
+La performance est toujours **nette des apports** : un versement de 500 € ne
+doit pas apparaître comme un gain.
+
+### Le cache des cours
+
+| Donnée | Fréquence maximale |
+|---|---|
+| Cours du jour | 1 requête **groupée** par minute |
+| Clôtures quotidiennes | 1 par instrument et par heure |
+| Intraday (1J, 7J) | 1 par instrument toutes les 5 minutes |
+
+En régime établi, naviguer entre les périodes ne déclenche aucune requête.
+
+Deux garde-fous méritent d'être connus, car leur absence a été mesurée à six
+requêtes superflues par affichage, indéfiniment :
+
+- **La fraîcheur ne se juge pas sur un calendrier.** Un ETF Euronext consulté
+  un mardi a sa dernière clôture au vendredi : le déclarer périmé conduirait à
+  le réinterroger sans fin, la place n'ayant rien publié de neuf. D'où
+  `instruments.history_checked_at`, qui borne la fréquence des tentatives.
+- **Un fournisseur ne remonte pas indéfiniment.** Réclamer l'historique depuis
+  2020 alors qu'il ne couvre que 2021 laisse un écart permanent. D'où
+  `history_from`, qui mémorise la date la plus ancienne déjà demandée.
+
+Le fournisseur est isolé derrière l'interface `PriceProvider`
+(`src/server/prices/provider.ts`) : en changer ne touche pas au métier.
+
+---
 
 ## Commandes
 
 | Commande | Rôle |
 |---|---|
-| `npm run dev` | Serveur de développement (migre la base au passage) |
+| `npm run dev` | Serveur de développement |
 | `npm run build` | Build de production |
+| `npm run auth:user` | Crée un compte d'accès (mot de passe saisi masqué) |
 | `npm run seed -- --reset` | Jeu de démonstration |
-| `npm run import` | Import du portefeuille réel (script local, hors dépôt) |
-| `npm run db:reset` | Vide le portefeuille en conservant le cache de cours |
+| `npm run db:reset` | Vide le portefeuille, conserve le cache de cours |
 | `npm run db:studio` | Explorateur de base Drizzle |
 | `npm run check:engine` | Vérifie valorisation et historique en console |
-| `npm run auth:user` | Crée le compte d'accès (mot de passe saisi masqué) |
 
 ## Données
 
-Tout est stocké dans `data/portfolio.db` (SQLite). Sauvegarder revient à copier
-ce fichier. Il est exclu du dépôt par `.gitignore`.
+Tout tient dans un fichier SQLite : `data/portfolio.db` en local,
+`/app/data/portfolio.db` dans le conteneur. Il est exclu du dépôt.
