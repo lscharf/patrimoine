@@ -10,6 +10,17 @@ Image publiée à chaque fusion sur `main` : `ghcr.io/lscharf/patrimoine:latest`
 
 ## Déployer avec Docker
 
+Deux modes, au choix. Le premier suffit à faire tourner l'application ; le
+second n'a d'intérêt que si vous centralisez déjà vos accès.
+
+| | **Autonome** | **Avec Authelia** |
+|---|---|---|
+| Connexion | mot de passe local | Authelia, plus le mot de passe local en secours |
+| Variables à renseigner | 3 | 6 |
+| À prévoir | un proxy inverse TLS | un proxy inverse TLS et une instance Authelia |
+
+Les étapes 1, 3 et 4 sont communes ; seule l'étape 2 diffère.
+
 ### 1. Récupérer les fichiers
 
 ```bash
@@ -20,7 +31,9 @@ curl -o .env https://raw.githubusercontent.com/lscharf/patrimoine/main/.env.exam
 
 ### 2. Renseigner `.env`
 
-Trois variables suffisent pour démarrer :
+#### Mode autonome
+
+Trois variables, et c'est tout :
 
 ```bash
 BETTER_AUTH_SECRET=      # openssl rand -base64 32
@@ -28,9 +41,25 @@ BETTER_AUTH_URL=         # URL publique, ex. https://patrimoine.exemple.fr
 AUTH_ALLOWED_EMAILS=     # votre adresse
 ```
 
-> `AUTH_ALLOWED_EMAILS` n'est pas optionnel : sans lui **aucun compte ne peut
-> être créé ni aucune session ouverte**. Le comportement est fermé par défaut,
-> volontairement.
+Laissez les trois `AUTHELIA_*` vides ou commentées : l'OIDC ne s'active que si
+elles sont **toutes les trois** renseignées, et le bouton correspondant
+n'apparaît pas.
+
+#### Mode Authelia
+
+Les trois mêmes, plus :
+
+```bash
+AUTHELIA_ISSUER=         # ex. https://auth.exemple.fr
+AUTHELIA_CLIENT_ID=patrimoine
+AUTHELIA_CLIENT_SECRET=  # le secret en clair (l'empreinte va chez Authelia)
+```
+
+Il faut aussi déclarer le client côté Authelia — voir plus bas.
+
+> Dans les deux cas, `AUTH_ALLOWED_EMAILS` n'est pas optionnel : sans lui
+> **aucun compte ne peut être créé ni aucune session ouverte**. Le comportement
+> est fermé par défaut, volontairement.
 
 ### 3. Démarrer
 
@@ -43,13 +72,13 @@ complète sans intervention.
 
 ### 4. Créer son accès
 
-Avec Authelia branché (voir plus bas), la première connexion d'une adresse
-figurant dans la liste blanche crée le compte. Sinon, depuis une copie locale
-du dépôt pointée sur la même base :
+Ouvrez l'application : tant qu'aucun compte n'existe, elle propose de créer le
+vôtre. Le formulaire disparaît définitivement une fois le compte créé, et
+n'accepte qu'une adresse figurant dans `AUTH_ALLOWED_EMAILS`.
 
-```bash
-npm run auth:user
-```
+En mode Authelia, vous pouvez aussi bien vous connecter directement par
+« Se connecter avec Authelia » : la première connexion d'une adresse autorisée
+crée le compte.
 
 ### Le port n'est pas publié sur toutes les interfaces
 
@@ -67,7 +96,9 @@ ports:
 
 ---
 
-## Connecter Authelia
+## Déclarer le client Authelia
+
+*Mode Authelia uniquement — sautez cette section en mode autonome.*
 
 Déclarez un client dans `identity_providers.oidc.clients` :
 
@@ -167,7 +198,10 @@ npm run seed -- --reset
 ```
 
 L'authentification s'applique aussi en local : renseignez au moins
-`AUTH_ALLOWED_EMAILS` dans un fichier `.env`, puis `npm run auth:user`.
+`AUTH_ALLOWED_EMAILS` dans un fichier `.env`. Le compte se crée depuis
+l'interface, ou en ligne de commande avec `npm run auth:user` — cette seconde
+voie n'existe qu'en développement, l'image d'exécution ne contenant ni `tsx`
+ni les sources.
 
 ---
 

@@ -13,7 +13,6 @@
     "seed": "tsx --conditions=react-server src/db/seed.ts",
     "check:engine": "tsx --conditions=react-server scripts/check-engine.mts",
     "db:reset": "tsx --conditions=react-server src/db/reset.ts",
-    "import": "tsx --conditions=react-server scripts/import-portefeuille.ts",
     "auth:user": "tsx --conditions=react-server --env-file-if-exists=.env scripts/create-user.ts"
   },
   "dependencies": {

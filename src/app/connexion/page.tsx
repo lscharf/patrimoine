@@ -1,7 +1,9 @@
 import { redirect } from "next/navigation";
 import { LoginForm } from "@/components/auth/login-form";
+import { SignupForm } from "@/components/auth/signup-form";
 import { safeRedirect } from "@/lib/safe-redirect";
 import { allowlistConfigured, oidcEnabled } from "@/server/auth/config";
+import { aucunCompteExistant } from "@/server/auth/first-run";
 import { getSession } from "@/server/auth/session";
 
 export const dynamic = "force-dynamic";
@@ -14,6 +16,10 @@ export default async function LoginPage({ searchParams }: PageProps<"/connexion"
   const redirectTo = safeRedirect(params.suite);
 
   if (session?.user) redirect(redirectTo);
+
+  // Première installation : proposer la création du compte plutôt qu'un
+  // formulaire de connexion sans issue.
+  const premiereInstallation = aucunCompteExistant();
 
   return (
     <main className="flex flex-1 items-center justify-center px-4 py-12">
@@ -29,10 +35,12 @@ export default async function LoginPage({ searchParams }: PageProps<"/connexion"
         </div>
 
         <h1 className="text-xl font-semibold tracking-tight text-ink">
-          Connexion
+          {premiereInstallation ? "Créer votre accès" : "Connexion"}
         </h1>
         <p className="mt-1.5 mb-7 text-sm text-ink-muted">
-          Cette application donne accès à vos données financières.
+          {premiereInstallation
+            ? "Aucun compte n'existe encore. Ce formulaire ne s'affichera plus une fois le vôtre créé."
+            : "Cette application donne accès à vos données financières."}
         </p>
 
         {!allowlistConfigured && (
@@ -47,7 +55,11 @@ export default async function LoginPage({ searchParams }: PageProps<"/connexion"
           </p>
         )}
 
-        <LoginForm oidcEnabled={oidcEnabled} redirectTo={redirectTo} />
+        {premiereInstallation ? (
+          <SignupForm redirectTo={redirectTo} />
+        ) : (
+          <LoginForm oidcEnabled={oidcEnabled} redirectTo={redirectTo} />
+        )}
       </div>
     </main>
   );
