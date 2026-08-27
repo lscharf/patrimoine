@@ -17,6 +17,7 @@ const DB_PATH =
 const globalForDb = globalThis as unknown as {
   __sqlite?: Database.Database;
 };
+const isBuildPhase = process.env.NEXT_PHASE === "phase-production-build";
 
 /**
  * Applique les migrations en attente au démarrage du serveur.
@@ -26,10 +27,13 @@ const globalForDb = globalThis as unknown as {
  * démarrage est un simple `node server.js`. Sans cela, un volume neuf
  * donnerait une base vide et la première requête échouerait.
  *
+ * L'opération est ignorée pendant la phase de compilation `next build`
+ * pour éviter les conflits d'accès concurrents entre les workers de build.
  * L'opération est idempotente — Drizzle tient un journal des migrations
  * appliquées — et coûte quelques millisecondes lorsqu'il n'y a rien à faire.
  */
 function runMigrations(connection: Database.Database) {
+  if (isBuildPhase) return;
   const folder = path.join(process.cwd(), "drizzle");
   if (!fs.existsSync(folder)) {
     console.warn(
