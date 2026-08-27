@@ -100,6 +100,66 @@ export async function GET(request: NextRequest) {
       liveValues: new Map(snapshot.holdings.map((h) => [h.id, h.value])),
     });
 
+    const holdingPeriodChanges = new Map(
+      history.byHolding.map((bh) => [bh.holdingId, bh]),
+    );
+
+    const accountsWithPeriod = snapshot.accounts.map((a) => {
+      const ownHoldings = snapshot.holdings.filter((h) => h.accountId === a.id);
+      let startValue = 0;
+      let endValue = 0;
+      let netFlows = 0;
+      let change = 0;
+
+      for (const h of ownHoldings) {
+        const bh = holdingPeriodChanges.get(h.id);
+        if (bh) {
+          startValue += bh.startValue;
+          endValue += bh.endValue;
+          netFlows += bh.netFlows;
+          change += bh.change;
+        } else {
+          startValue += 0;
+          endValue += h.value;
+          netFlows += h.costBasis;
+          change += 0;
+        }
+      }
+
+      let periodChange = change;
+      let periodChangePct: number | null = null;
+
+      if (range === "1J") {
+        periodChange = a.dayChange ?? change;
+        periodChangePct = a.dayChangePct;
+      } else if (range === "TOUT") {
+        periodChange = a.unrealizedPL;
+        periodChangePct = a.unrealizedPLPct;
+      } else {
+        const base = startValue + Math.max(netFlows, 0);
+        periodChangePct = base > 0 ? change / base : null;
+      }
+
+      return {
+        id: a.id,
+        name: a.name,
+        kind: a.kind,
+        institution: a.institution,
+        currency: a.currency,
+        color: a.color,
+        value: a.value,
+        costBasis: a.costBasis,
+        unrealizedPL: a.unrealizedPL,
+        unrealizedPLPct: a.unrealizedPLPct,
+        periodChange,
+        periodChangePct,
+        dayChange: a.dayChange,
+        dayChangePct: a.dayChangePct,
+        weight: a.weight,
+        holdingsCount: a.holdings.length,
+      };
+    });
+
     return NextResponse.json({
       totalValue: snapshot.totalValue,
       totalCostBasis: snapshot.totalCostBasis,
@@ -119,40 +179,39 @@ export async function GET(request: NextRequest) {
         changePct: history.changePct,
         isIntraday: history.isIntraday,
       },
-      accounts: snapshot.accounts.map((a) => ({
-        id: a.id,
-        name: a.name,
-        kind: a.kind,
-        institution: a.institution,
-        currency: a.currency,
-        color: a.color,
-        value: a.value,
-        costBasis: a.costBasis,
-        unrealizedPL: a.unrealizedPL,
-        unrealizedPLPct: a.unrealizedPLPct,
-        dayChange: a.dayChange,
-        dayChangePct: a.dayChangePct,
-        weight: a.weight,
-        holdingsCount: a.holdings.length,
-      })),
-      holdings: snapshot.holdings.map((h) => ({
-        id: h.id,
-        label: h.label,
-        kind: h.kind,
-        accountId: h.accountId,
-        accountName: h.accountName,
-        accountColor: h.accountColor,
-        symbol: h.symbol,
-        quantity: h.quantity,
-        value: h.value,
-        costBasis: h.costBasis,
-        unrealizedPL: h.unrealizedPL,
-        unrealizedPLPct: h.unrealizedPLPct,
-        dayChange: h.dayChange,
-        dayChangePct: h.dayChangePct,
-        weight: h.weight,
-        stale: h.stale,
-      })),
+      accounts: accountsWithPeriod,
+      holdings: snapshot.holdings.map((h) => {
+        const bh = holdingPeriodChanges.get(h.id);
+        let periodChange = bh?.change ?? 0;
+        let periodChangePct = bh?.changePct ?? null;
+        if (range === "1J") {
+          periodChange = h.dayChange ?? periodChange;
+          periodChangePct = h.dayChangePct ?? periodChangePct;
+        } else if (range === "TOUT") {
+          periodChange = h.unrealizedPL;
+          periodChangePct = h.unrealizedPLPct;
+        }
+        return {
+          id: h.id,
+          label: h.label,
+          kind: h.kind,
+          accountId: h.accountId,
+          accountName: h.accountName,
+          accountColor: h.accountColor,
+          symbol: h.symbol,
+          quantity: h.quantity,
+          value: h.value,
+          costBasis: h.costBasis,
+          unrealizedPL: h.unrealizedPL,
+          unrealizedPLPct: h.unrealizedPLPct,
+          periodChange,
+          periodChangePct,
+          dayChange: h.dayChange,
+          dayChangePct: h.dayChangePct,
+          weight: h.weight,
+          stale: h.stale,
+        };
+      }),
       updatedAt: snapshot.updatedAt,
     });
   } catch (err) {
