@@ -24,9 +24,9 @@ export function middleware(request: NextRequest) {
 export const config = {
   matcher: [
     /**
-     * Tout, sauf : les routes d'authentification, la sonde de santé, la page
-     * de connexion elle-même, et les ressources statiques.
+     * Tout, sauf : les routes d'API, la page de connexion elle-même,
+     * et les ressources statiques.
      */
-    "/((?!api/auth|api/health|connexion|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
+    "/((?!api/|connexion|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
   ],
 };
