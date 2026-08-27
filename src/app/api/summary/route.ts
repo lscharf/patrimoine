@@ -4,11 +4,16 @@ import { db } from "@/db";
 import { accounts, authUser } from "@/db/schema";
 import { getSession } from "@/server/auth/session";
 import { buildSnapshot } from "@/server/portfolio/snapshot";
+import { buildHistory } from "@/server/portfolio/history";
+import { parseRange } from "@/lib/range";
 
 export const dynamic = "force-dynamic";
 
 /**
  * Point d'accès synthétique pour les widgets, barres d'état et intégrations externes.
+ *
+ * Paramètres query :
+ * - `range` ou `p` : Fenêtre temporelle ("1J", "7J", "1M", "3M", "6M", "YTD", "1A", "TOUT"). Par défaut "1M".
  *
  * Authentification supportée :
  * 1. Cookie de session web Better Auth
@@ -81,7 +86,20 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    const range = parseRange(
+      request.nextUrl.searchParams.get("range") ??
+        request.nextUrl.searchParams.get("p") ??
+        undefined,
+    );
+
     const snapshot = await buildSnapshot(userId);
+
+    const history = await buildHistory(range, {
+      userId,
+      liveTotal: snapshot.totalValue,
+      liveValues: new Map(snapshot.holdings.map((h) => [h.id, h.value])),
+    });
+
     return NextResponse.json({
       totalValue: snapshot.totalValue,
       totalCostBasis: snapshot.totalCostBasis,
@@ -92,6 +110,15 @@ export async function GET(request: NextRequest) {
       fees: snapshot.fees,
       dayChange: snapshot.dayChange,
       dayChangePct: snapshot.dayChangePct,
+      history: {
+        range: history.range,
+        startValue: history.startValue,
+        endValue: history.endValue,
+        netFlows: history.netFlows,
+        change: history.change,
+        changePct: history.changePct,
+        isIntraday: history.isIntraday,
+      },
       accounts: snapshot.accounts.map((a) => ({
         id: a.id,
         name: a.name,
