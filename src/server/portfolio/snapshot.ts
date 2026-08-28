@@ -5,6 +5,7 @@ import {
   accounts,
   holdings,
   instruments,
+  loans,
   manualValues,
   transactions,
 } from "@/db/schema";
@@ -15,6 +16,7 @@ import {
   refreshFxRate,
   refreshQuotes,
 } from "@/server/prices/cache";
+import { computeLiabilitiesSummary } from "@/server/loans/amortization";
 import { computeCostBasis } from "./cost-basis";
 import type {
   AccountSnapshot,
@@ -267,8 +269,18 @@ export async function buildSnapshot(userId: string): Promise<PortfolioSnapshot> 
   const dayChange = snapshots.reduce((s, h) => s + (h.dayChange ?? 0), 0);
   const prevTotal = totalValue - dayChange;
 
+  const userLoans = db.select().from(loans).where(eq(loans.userId, userId)).all();
+  const liabilities = computeLiabilitiesSummary(userLoans);
+  const totalLiabilities = liabilities.totalRemainingCapital;
+  const netWorth = totalValue - totalLiabilities;
+
   return {
     totalValue,
+    grossAssets: totalValue,
+    totalLiabilities,
+    netWorth,
+    monthlyLoanPayment: liabilities.totalMonthlyPayment,
+    loansCount: liabilities.loansCount,
     totalCostBasis,
     unrealizedPL,
     unrealizedPLPct: totalCostBasis > 0 ? unrealizedPL / totalCostBasis : null,

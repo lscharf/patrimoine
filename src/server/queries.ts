@@ -1,8 +1,15 @@
 import "server-only";
 import { cache } from "react";
-import { asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { accounts, holdings, instruments, manualValues, transactions } from "@/db/schema";
+import {
+  accounts,
+  holdings,
+  instruments,
+  loans,
+  manualValues,
+  transactions,
+} from "@/db/schema";
 import type { ManualValue, Transaction } from "@/db/schema";
 import { requireUserId } from "./auth/session";
 import { buildSnapshot } from "./portfolio/snapshot";
@@ -13,6 +20,14 @@ import type {
   PortfolioSnapshot,
   Range,
 } from "./portfolio/types";
+import type {
+  LiabilitiesSummary,
+  LoanDetail,
+} from "./loans/types";
+import {
+  computeLiabilitiesSummary,
+  computeLoanDetail,
+} from "./loans/amortization";
 
 /**
  * `cache()` déduplique l'appel sur toute la durée d'un rendu : le tableau, le
@@ -120,4 +135,71 @@ export const getAccountDetail = cache(async (id: number) => {
 
 export const getInstruments = cache(async () =>
   db.select().from(instruments).orderBy(asc(instruments.symbol)).all(),
+);
+
+export const getLiabilities = cache(async (): Promise<LiabilitiesSummary> => {
+  const userId = await requireUserId();
+  const loanRows = db
+    .select()
+    .from(loans)
+    .where(eq(loans.userId, userId))
+    .orderBy(desc(loans.createdAt))
+    .all();
+
+  const accountRows = db
+    .select({ id: accounts.id, name: accounts.name })
+    .from(accounts)
+    .where(eq(accounts.userId, userId))
+    .all();
+  const accountsMap = new Map<number, string>(
+    accountRows.map((a) => [a.id, a.name]),
+  );
+
+  const holdingRows = db
+    .select({ id: holdings.id, label: holdings.label })
+    .from(holdings)
+    .innerJoin(accounts, eq(holdings.accountId, accounts.id))
+    .where(eq(accounts.userId, userId))
+    .all();
+  const holdingsMap = new Map<number, string>(
+    holdingRows.map((h) => [h.id, h.label]),
+  );
+
+  return computeLiabilitiesSummary(loanRows, { accountsMap, holdingsMap });
+});
+
+export const getLoanDetail = cache(
+  async (id: number): Promise<LoanDetail | null> => {
+    const userId = await requireUserId();
+    const loan = db
+      .select()
+      .from(loans)
+      .where(and(eq(loans.id, id), eq(loans.userId, userId)))
+      .get();
+
+    if (!loan) return null;
+
+    let linkedAccountName: string | null = null;
+    if (loan.accountId) {
+      const acc = db
+        .select({ name: accounts.name })
+        .from(accounts)
+        .where(and(eq(accounts.id, loan.accountId), eq(accounts.userId, userId)))
+        .get();
+      linkedAccountName = acc?.name ?? null;
+    }
+
+    let linkedHoldingLabel: string | null = null;
+    if (loan.holdingId) {
+      const h = db
+        .select({ label: holdings.label })
+        .from(holdings)
+        .innerJoin(accounts, eq(holdings.accountId, accounts.id))
+        .where(and(eq(holdings.id, loan.holdingId), eq(accounts.userId, userId)))
+        .get();
+      linkedHoldingLabel = h?.label ?? null;
+    }
+
+    return computeLoanDetail(loan, { linkedAccountName, linkedHoldingLabel });
+  },
 );

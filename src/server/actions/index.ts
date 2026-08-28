@@ -8,6 +8,7 @@ import {
   accounts,
   holdings,
   instruments,
+  loans,
   manualValues,
   transactions,
 } from "@/db/schema";
@@ -15,6 +16,7 @@ import { currentUserId } from "@/server/auth/session";
 import {
   ownsAccount,
   ownsHolding,
+  ownsLoan,
   ownsManualValue,
   ownsTransaction,
 } from "@/server/auth/ownership";
@@ -23,6 +25,7 @@ import { yahooProvider } from "@/server/prices/yahoo";
 import type { SearchHit } from "@/server/prices/provider";
 import {
   accountInput,
+  loanInput,
   manualHoldingInput,
   manualValueInput,
   quotedHoldingInput,
@@ -429,6 +432,125 @@ export async function deleteManualValue(id: number): Promise<ActionResult> {
   if (!ownsManualValue(userId, id)) return fail(FORBIDDEN);
 
   db.delete(manualValues).where(eq(manualValues.id, id)).run();
+  refresh();
+  return { ok: true };
+}
+
+/* ------------------------------------------------------------------ *
+ * Emprunts & Passif
+ * ------------------------------------------------------------------ */
+
+export async function createLoan(raw: unknown): Promise<ActionResult<number>> {
+  const userId = await currentUserId();
+  if (!userId) return fail(UNAUTHORIZED);
+
+  const parsed = loanInput.safeParse(raw);
+  if (!parsed.success) return fromZod(parsed.error);
+
+  const {
+    name,
+    type,
+    borrowedAmount,
+    downPayment = 0,
+    initialFees = 0,
+    interestRate,
+    insuranceRate = 0,
+    durationMonths,
+    startDate,
+    customMonthlyPayment,
+    accountId,
+    holdingId,
+    notes,
+  } = parsed.data;
+
+  if (accountId && !ownsAccount(userId, accountId)) return fail(FORBIDDEN);
+  if (holdingId && !ownsHolding(userId, holdingId)) return fail(FORBIDDEN);
+
+  const created = db
+    .insert(loans)
+    .values({
+      userId,
+      name,
+      type,
+      borrowedAmount,
+      downPayment: downPayment ?? 0,
+      initialFees: initialFees ?? 0,
+      interestRate,
+      insuranceRate: insuranceRate ?? 0,
+      durationMonths,
+      startDate,
+      customMonthlyPayment: customMonthlyPayment ?? null,
+      accountId: accountId ?? null,
+      holdingId: holdingId ?? null,
+      notes: notes || null,
+    })
+    .returning({ id: loans.id })
+    .get();
+
+  refresh();
+  return { ok: true, data: created.id };
+}
+
+export async function updateLoan(
+  id: number,
+  raw: unknown,
+): Promise<ActionResult> {
+  const userId = await currentUserId();
+  if (!userId) return fail(UNAUTHORIZED);
+  if (!ownsLoan(userId, id)) return fail(FORBIDDEN);
+
+  const parsed = loanInput.safeParse(raw);
+  if (!parsed.success) return fromZod(parsed.error);
+
+  const {
+    name,
+    type,
+    borrowedAmount,
+    downPayment = 0,
+    initialFees = 0,
+    interestRate,
+    insuranceRate = 0,
+    durationMonths,
+    startDate,
+    customMonthlyPayment,
+    accountId,
+    holdingId,
+    notes,
+  } = parsed.data;
+
+  if (accountId && !ownsAccount(userId, accountId)) return fail(FORBIDDEN);
+  if (holdingId && !ownsHolding(userId, holdingId)) return fail(FORBIDDEN);
+
+  db.update(loans)
+    .set({
+      name,
+      type,
+      borrowedAmount,
+      downPayment: downPayment ?? 0,
+      initialFees: initialFees ?? 0,
+      interestRate,
+      insuranceRate: insuranceRate ?? 0,
+      durationMonths,
+      startDate,
+      customMonthlyPayment: customMonthlyPayment ?? null,
+      accountId: accountId ?? null,
+      holdingId: holdingId ?? null,
+      notes: notes || null,
+      updatedAt: Date.now(),
+    })
+    .where(eq(loans.id, id))
+    .run();
+
+  refresh();
+  return { ok: true };
+}
+
+export async function deleteLoan(id: number): Promise<ActionResult> {
+  const userId = await currentUserId();
+  if (!userId) return fail(UNAUTHORIZED);
+  if (!ownsLoan(userId, id)) return fail(FORBIDDEN);
+
+  db.delete(loans).where(eq(loans.id, id)).run();
   refresh();
   return { ok: true };
 }

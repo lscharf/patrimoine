@@ -41,6 +41,23 @@ export const TX_TYPE_LABELS: Record<(typeof TX_TYPES)[number], string> = {
   WITHDRAWAL: "Retrait",
 };
 
+export const LOAN_KINDS = [
+  "AMORTIZING",
+  "IN_FINE",
+  "PTZ",
+  "OTHER",
+] as const;
+
+export const LOAN_KIND_LABELS: Record<
+  (typeof LOAN_KINDS)[number],
+  string
+> = {
+  AMORTIZING: "Prêt amortissable (standard)",
+  IN_FINE: "Prêt in fine",
+  PTZ: "Prêt à taux zéro (PTZ)",
+  OTHER: "Autre prêt",
+};
+
 const isoDay = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}$/, "Date attendue au format AAAA-MM-JJ");
@@ -134,8 +151,29 @@ export const manualValueInput = z.object({
   value: nonNegative,
 });
 
+export const loanInput = z.object({
+  name: z.string().trim().min(1, "Le nom est obligatoire").max(100),
+  type: z.enum(LOAN_KINDS).default("AMORTIZING"),
+  borrowedAmount: positive,
+  downPayment: nonNegative.optional(),
+  initialFees: nonNegative.optional(),
+  interestRate: nonNegative,
+  insuranceRate: nonNegative.optional(),
+  durationMonths: z.coerce
+    .number()
+    .int()
+    .min(1, "La durée minimale est de 1 mois")
+    .max(600, "Durée maximale 50 ans"),
+  startDate: isoDay,
+  customMonthlyPayment: nonNegative.optional(),
+  accountId: z.coerce.number().int().positive().nullable().optional(),
+  holdingId: z.coerce.number().int().positive().nullable().optional(),
+  notes: z.string().trim().max(500).optional().or(z.literal("")),
+});
+
 export type AccountInput = z.infer<typeof accountInput>;
 export type QuotedHoldingInput = z.infer<typeof quotedHoldingInput>;
 export type ManualHoldingInput = z.infer<typeof manualHoldingInput>;
 export type TransactionInput = z.infer<typeof transactionInput>;
 export type ManualValueInput = z.infer<typeof manualValueInput>;
+export type LoanInput = z.infer<typeof loanInput>;

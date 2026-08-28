@@ -201,10 +201,64 @@ export const fxState = sqliteTable("fx_state", {
   historyFrom: text("history_from"),
 });
 
-export * from "./auth-schema";
+/* ------------------------------------------------------------------ *
+ * Emprunts & Passif — "Prêt Immobilier", "Prêt Conso", "PTZ"...
+ * ------------------------------------------------------------------ */
+export const loans = sqliteTable(
+  "loans",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    userId: text("user_id").references(() => authUser.id, {
+      onDelete: "cascade",
+    }),
+    name: text("name").notNull(),
+    /** AMORTIZING | IN_FINE | PTZ | OTHER */
+    type: text("type").notNull().default("AMORTIZING"),
+    /** Capital initial emprunté */
+    borrowedAmount: real("borrowed_amount").notNull(),
+    /** Apport personnel initial (optionnel) */
+    downPayment: real("down_payment").notNull().default(0),
+    /** Frais de dossier / garantie initiaux (optionnel) */
+    initialFees: real("initial_fees").notNull().default(0),
+    /** Taux d'intérêt annuel en pourcentage (ex: 4.07 pour 4.07%) */
+    interestRate: real("interest_rate").notNull().default(0),
+    /** Taux d'assurance annuel en pourcentage (ex: 0.36 pour 0.36%) */
+    insuranceRate: real("insurance_rate").notNull().default(0),
+    /** Durée totale en mois (ex: 108 pour 9 ans) */
+    durationMonths: integer("duration_months").notNull(),
+    /** Date de première échéance / début (YYYY-MM-DD) */
+    startDate: text("start_date").notNull(),
+    /** Mensualité personnalisée facultative (calculée si non renseignée) */
+    customMonthlyPayment: real("custom_monthly_payment"),
+    /** Compte ou ligne d'actif lié(e) (optionnel) */
+    accountId: integer("account_id").references(() => accounts.id, {
+      onDelete: "set null",
+    }),
+    holdingId: integer("holding_id").references(() => holdings.id, {
+      onDelete: "set null",
+    }),
+    notes: text("notes"),
+    createdAt: integer("created_at")
+      .notNull()
+      .default(sql`(unixepoch() * 1000)`),
+    updatedAt: integer("updated_at")
+      .notNull()
+      .default(sql`(unixepoch() * 1000)`),
+  },
+  (t) => [index("loans_user_idx").on(t.userId)],
+);
+
+export {
+  authUser,
+  authSession,
+  authAccount,
+  authVerification,
+  type AuthUser,
+} from "./auth-schema";
 
 export type Account = typeof accounts.$inferSelect;
 export type Instrument = typeof instruments.$inferSelect;
 export type Holding = typeof holdings.$inferSelect;
 export type Transaction = typeof transactions.$inferSelect;
 export type ManualValue = typeof manualValues.$inferSelect;
+export type Loan = typeof loans.$inferSelect;

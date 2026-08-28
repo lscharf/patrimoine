@@ -86,7 +86,17 @@ export type AccountSnapshot = {
 };
 
 export type PortfolioSnapshot = {
+  /** Valeur brute totale des actifs (comptes, investissements) */
   totalValue: number;
+  grossAssets: number;
+  /** Total du passif (capital restant dû sur les emprunts) */
+  totalLiabilities: number;
+  /** Patrimoine net (Actifs bruts − Passif) */
+  netWorth: number;
+  /** Total des mensualités actuelles de crédit par mois */
+  monthlyLoanPayment: number;
+  /** Nombre d'emprunts */
+  loansCount: number;
   totalCostBasis: number;
   unrealizedPL: number;
   unrealizedPLPct: number | null;

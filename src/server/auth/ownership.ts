@@ -1,7 +1,7 @@
 import "server-only";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { accounts, holdings, manualValues, transactions } from "@/db/schema";
+import { accounts, holdings, loans, manualValues, transactions } from "@/db/schema";
 
 /**
  * Contrôles de propriété.
@@ -57,6 +57,16 @@ export function ownsManualValue(userId: string, valueId: number): boolean {
       .innerJoin(holdings, eq(manualValues.holdingId, holdings.id))
       .innerJoin(accounts, eq(holdings.accountId, accounts.id))
       .where(and(eq(manualValues.id, valueId), eq(accounts.userId, userId)))
+      .get() != null
+  );
+}
+
+export function ownsLoan(userId: string, loanId: number): boolean {
+  return (
+    db
+      .select({ id: loans.id })
+      .from(loans)
+      .where(and(eq(loans.id, loanId), eq(loans.userId, userId)))
       .get() != null
   );
 }

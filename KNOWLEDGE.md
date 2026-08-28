@@ -47,6 +47,8 @@ patrimoine/
 │   │   ├── (dashboard)/page.tsx # Vue d'ensemble (Patrimoine, graphiques, allocation, lignes)
 │   │   ├── comptes/            # Liste des enveloppes / comptes
 │   │   │   └── [id]/page.tsx   # Détail d'un compte avec ses lignes et historique
+│   │   ├── emprunts/           # Vue d'ensemble du passif et des crédits
+│   │   │   └── [id]/page.tsx   # Détail Finary d'un emprunt (Aperçu, Analyse, Paramètres)
 │   │   ├── lignes/[id]/page.tsx # Détail d'une ligne (métriques, valorisations, transactions)
 │   │   ├── transactions/page.tsx# Journal global de toutes les opérations
 │   │   ├── connexion/page.tsx  # Écran de connexion / onboarding premier run
@@ -87,10 +89,13 @@ patrimoine/
 │       │   ├── yahoo.ts        # Implémentation Yahoo Finance avec retries et normalisation
 │       │   └── cache.ts        # Cache SQLite & mémoire des cours, barres et taux de change
 │       └── portfolio/
-│           ├── types.ts        # Types métiers (HoldingSnapshot, PortfolioSnapshot, Range, etc.)
-│           ├── cost-basis.ts   # Calcul du PRU pondéré, timeline de quantité, flux nets
-│           ├── snapshot.ts     # Construction du snapshot temps réel du portefeuille
-│           └── history.ts      # Moteur de reconstruction de la courbe historique (daily + intraday)
+│       ├── actions/            # Server Actions sécurisées (mutations CRUD comptes, lignes, emprunts)
+│       ├── auth/               # Logique de session, contrôle de propriété et garde-fous
+│       ├── loans/              # Moteur financier d'amortissement (échéanciers, mensualités, courbes)
+│       ├── portfolio/          # Moteur de calcul du portefeuille & historique
+│       │   ├── cost-basis.ts   # Calcul du PRU multi-devises et des P&L réalisés
+│       │   ├── history.ts      # Moteur de reconstruction de la courbe historique (daily + intraday)
+│       │   └── snapshot.ts     # Agrégation instantanée du patrimoine brut et net
 ```
 
 ---
@@ -118,9 +123,9 @@ erDiagram
   - `DIVIDEND` / `FEE` : flux de trésorerie associés (`amount`).
   - `DEPOSIT` / `WITHDRAWAL` : versements et retraits pour les lignes non cotées (`amount`).
 - **`manual_values`** : Historique des valorisations saisies pour les lignes non cotées (`holdingId`, `date`, `value`).
+- **`loans`** : Emprunts et crédits amortissables (`name`, `type`, `borrowedAmount`, `interestRate`, `insuranceRate`, `durationMonths`, `startDate`, `customMonthlyPayment`, etc.).
 - **`price_bars`** : Cache des clôtures quotidiennes (`instrumentId`, `date`, `close`). Clé primaire composite `(instrument_id, date)`.
 - **`fx_bars`** & **`fx_state`** : Cache des taux de change historiques et état de synchronisation vers l'euro (`pair`, `date`, `rate`).
-
 ### Tables d'authentification (`src/db/auth-schema.ts`)
 - **`auth_user`**, **`auth_session`**, **`auth_account`**, **`auth_verification`** (gérées par Better Auth avec Drizzle adapter).
 - Préfixées `auth_` pour ne pas entrer en collision avec `accounts` (comptes financiers).
@@ -161,6 +166,17 @@ $$\text{Performance (\%)} = \frac{\text{Performance (€)}}{V_{\text{start}} + \
 - 7J : fenêtre glissante de 7 jours avec pas de 1 heure (`1h`).
 - Les données intraday sont conservées dans un cache mémoire en processus (`intradayCache`, TTL 5 minutes) et ne sont pas écrites en base pour éviter d'engorger SQLite.
 
+
+### 5.5. Amortissement & Passif — `src/server/loans/amortization.ts`
+- **Types supportés** : Prêt amortissable standard (`AMORTIZING`), Prêt in fine (`IN_FINE`), Prêt à taux zéro (`PTZ`), Autre (`OTHER`).
+- **Calculs de mensualité** :
+  $$r = \frac{\text{Taux d'intérêt annuel}}{100 \times 12}$$
+  $$M_{\text{base}} = \frac{C \cdot r}{1 - (1 + r)^{-n}} \quad (\text{ou } \frac{C}{n} \text{ si } r = 0)$$
+  $$M_{\text{assurance}} = \frac{C \cdot (\text{Taux d'assurance annuel} / 100)}{12}$$
+  $$M_{\text{totale}} = M_{\text{base}} + M_{\text{assurance}}$$
+- **Échéancier complet** : Décomposition mois par mois (Capital amorti, Intérêts, Assurance, Capital restant dû).
+- **Patrimoine Net consolidé** :
+  $$\text{Patrimoine Net} = \text{Actifs Bruts} - \sum \text{Capital Restant Dû des Emprunts Actifs}$$
 ---
 
 ## 6. Système de Cotations & Cache

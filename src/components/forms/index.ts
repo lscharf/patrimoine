@@ -28,3 +28,8 @@ export {
   type TransactionDialogProps,
   type TransactionInitial,
 } from "./transaction-dialog";
+export {
+  LoanDialog,
+  type LoanDialogProps,
+  type LoanInitial,
+} from "./loan-dialog";
