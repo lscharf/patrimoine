@@ -35,8 +35,13 @@ export function LoanCard({ loan }: { loan: LoanSummary }) {
                 <Badge variant="neutral" className="text-[10px] px-1.5 py-0">
                   {LOAN_TYPE_LABELS[loan.type] ?? loan.type}
                 </Badge>
-                {loan.linkedAccountName && (
+                {loan.groupName && (
                   <Badge variant="accent" className="text-[10px] px-1.5 py-0">
+                    {loan.groupName}
+                  </Badge>
+                )}
+                {loan.linkedAccountName && (
+                  <Badge variant="neutral" className="text-[10px] px-1.5 py-0">
                     {loan.linkedAccountName}
                   </Badge>
                 )}

@@ -43,6 +43,7 @@ export interface LoanSummary {
   endDate: string;
   customMonthlyPayment: number | null;
   currentBalance: number | null;
+  groupName: string | null;
   notes: string | null;
   accountId: number | null;
   holdingId: number | null;
@@ -83,6 +84,18 @@ export interface LoanDetail extends LoanSummary {
   chartPoints: SeriesPoint[];
 }
 
+/** Groupe d'emprunts consolidé (ex: Résidence Principale) */
+export interface LoanGroup {
+  name: string;
+  totalRemainingCapital: number;
+  totalBorrowedAmount: number;
+  totalMonthlyPayment: number;
+  totalPaidAmount: number;
+  averageInterestRate: number;
+  loansCount: number;
+  loans: LoanSummary[];
+}
+
 /** Synthèse consolidée de tous les emprunts (passif global) */
 export interface LiabilitiesSummary {
   totalRemainingCapital: number; // Total du capital restant dû
@@ -94,5 +107,7 @@ export interface LiabilitiesSummary {
   loansCount: number; // Nombre total d'emprunts
   activeLoansCount: number; // Nombre d'emprunts encore en cours
   loans: LoanSummary[];
+  groups: LoanGroup[]; // Emprunts groupés par projet/groupe
+  availableGroupNames: string[]; // Suggestions de groupes existants
   chartPoints: SeriesPoint[]; // Courbe globale d'extinction du passif
 }

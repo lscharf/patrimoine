@@ -459,6 +459,7 @@ export async function createLoan(raw: unknown): Promise<ActionResult<number>> {
     startDate,
     customMonthlyPayment,
     currentBalance,
+    groupName,
     accountId,
     holdingId,
     notes,
@@ -482,6 +483,7 @@ export async function createLoan(raw: unknown): Promise<ActionResult<number>> {
       startDate,
       customMonthlyPayment: customMonthlyPayment ?? null,
       currentBalance: currentBalance ?? null,
+      groupName: groupName?.trim() || null,
       accountId: accountId ?? null,
       holdingId: holdingId ?? null,
       notes: notes || null,
@@ -516,6 +518,7 @@ export async function updateLoan(
     startDate,
     customMonthlyPayment,
     currentBalance,
+    groupName,
     accountId,
     holdingId,
     notes,
@@ -535,12 +538,12 @@ export async function updateLoan(
       insuranceRate: insuranceRate ?? 0,
       durationMonths,
       currentBalance: currentBalance ?? null,
+      groupName: groupName?.trim() || null,
       startDate,
       customMonthlyPayment: customMonthlyPayment ?? null,
       accountId: accountId ?? null,
       holdingId: holdingId ?? null,
       notes: notes || null,
-      updatedAt: Date.now(),
     })
     .where(eq(loans.id, id))
     .run();

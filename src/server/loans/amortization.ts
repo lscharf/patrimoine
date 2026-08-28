@@ -4,6 +4,8 @@ import type {
   AmortizationScheduleRow,
   LiabilitiesSummary,
   LoanDetail,
+  LoanGroup,
+  LoanSummary,
   LoanType,
 } from "./types";
 
@@ -270,6 +272,7 @@ export function computeLoanDetail(
     endDate,
     customMonthlyPayment: loan.customMonthlyPayment,
     currentBalance: loan.currentBalance ?? null,
+    groupName: loan.groupName ?? null,
     notes: loan.notes,
     accountId: loan.accountId,
     holdingId: loan.holdingId,
@@ -398,6 +401,52 @@ export function computeLiabilitiesSummary(
       chartPoints.push({ t: epoch, v: Number(totalMonthCap.toFixed(2)) });
     }
   }
+  // Regroupement des prêts par groupe / projet
+  const groupMap = new Map<string, LoanSummary[]>();
+  const availableGroupNamesSet = new Set<string>();
+
+  for (const item of details) {
+    const gName = item.groupName?.trim();
+    if (gName) {
+      availableGroupNamesSet.add(gName);
+      const list = groupMap.get(gName) ?? [];
+      list.push(item);
+      groupMap.set(gName, list);
+    } else {
+      const list = groupMap.get("Autres crédits") ?? [];
+      list.push(item);
+      groupMap.set("Autres crédits", list);
+    }
+  }
+
+  const groups: LoanGroup[] = [];
+  for (const [name, gLoans] of groupMap.entries()) {
+    let gRem = 0;
+    let gBorrowed = 0;
+    let gMonthly = 0;
+    let gPaid = 0;
+    let gWeightedRate = 0;
+
+    for (const gl of gLoans) {
+      gRem += gl.currentRemainingCapital;
+      gBorrowed += gl.borrowedAmount;
+      gMonthly += gl.monthlyPayment;
+      gPaid += gl.totalPaid;
+      gWeightedRate += gl.interestRate * gl.currentRemainingCapital;
+    }
+
+    groups.push({
+      name,
+      totalRemainingCapital: Number(gRem.toFixed(2)),
+      totalBorrowedAmount: Number(gBorrowed.toFixed(2)),
+      totalMonthlyPayment: Number(gMonthly.toFixed(2)),
+      totalPaidAmount: Number(gPaid.toFixed(2)),
+      averageInterestRate: gRem > 0 ? Number((gWeightedRate / gRem).toFixed(2)) : 0,
+      loansCount: gLoans.length,
+      loans: gLoans,
+    });
+  }
+
   return {
     totalRemainingCapital: Number(totalRemainingCapital.toFixed(2)),
     totalBorrowedAmount: Number(totalBorrowedAmount.toFixed(2)),
@@ -408,6 +457,8 @@ export function computeLiabilitiesSummary(
     loansCount: loans.length,
     activeLoansCount,
     loans: details,
+    groups,
+    availableGroupNames: Array.from(availableGroupNamesSet),
     chartPoints,
   };
 }

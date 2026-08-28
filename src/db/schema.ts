@@ -239,6 +239,8 @@ export const loans = sqliteTable(
     holdingId: integer("holding_id").references(() => holdings.id, {
       onDelete: "set null",
     }),
+    /** Nom du groupe ou projet (ex: "Résidence Principale", "Investissement Locatif") */
+    groupName: text("group_name"),
     notes: text("notes"),
     createdAt: integer("created_at")
       .notNull()

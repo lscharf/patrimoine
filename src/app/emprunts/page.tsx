@@ -1,4 +1,4 @@
-import { Landmark, Plus, TrendingDown } from "lucide-react";
+import { Layers, Landmark, Plus, TrendingDown } from "lucide-react";
 import { AmortizationChart } from "@/components/chart/amortization-chart";
 import { LoanDialog } from "@/components/forms";
 import { LoanCard } from "@/components/loans/loan-card";
@@ -35,6 +35,7 @@ export default async function LoansPage() {
 
           <LoanDialog
             accounts={simpleAccounts}
+            availableGroupNames={liabilities.availableGroupNames}
             trigger={
               <Button className="shrink-0 gap-1.5 self-start sm:self-auto">
                 <Plus className="size-4" aria-hidden />
@@ -52,6 +53,7 @@ export default async function LoansPage() {
             action={
               <LoanDialog
                 accounts={simpleAccounts}
+                availableGroupNames={liabilities.availableGroupNames}
                 trigger={
                   <Button className="gap-1.5">
                     <Plus className="size-4" aria-hidden />
@@ -119,19 +121,63 @@ export default async function LoansPage() {
               )}
             </section>
 
-            {/* Liste des emprunts */}
-            <section className="space-y-4">
+            {/* Groupes de crédits */}
+            <section className="space-y-6">
               <div className="flex items-center justify-between">
                 <h2 className="text-base font-semibold text-ink">
                   Vos crédits ({liabilities.loans.length})
                 </h2>
               </div>
 
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {liabilities.loans.map((loan) => (
-                  <LoanCard key={loan.id} loan={loan} />
-                ))}
-              </div>
+              {liabilities.groups.map((group) => (
+                <div
+                  key={group.name}
+                  className="space-y-3 rounded-xl border border-hairline bg-surface/60 p-4 sm:p-5"
+                >
+                  <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between border-b border-hairline pb-3">
+                    <div className="flex items-center gap-2">
+                      <Layers className="size-4 text-accent" aria-hidden />
+                      <h3 className="text-sm font-semibold tracking-tight text-ink">
+                        {group.name}
+                      </h3>
+                      <span className="text-xs text-ink-muted">
+                        ({group.loans.length} crédit{group.loans.length > 1 ? "s" : ""})
+                      </span>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-3 text-xs">
+                      <span className="text-ink-muted">
+                        Total restant :{" "}
+                        <span className="tnum font-bold text-ink">
+                          <Montant>{formatCurrency(group.totalRemainingCapital)}</Montant>
+                        </span>
+                      </span>
+                      <span className="text-ink-faint">·</span>
+                      <span className="text-ink-muted">
+                        Mensualités :{" "}
+                        <span className="tnum font-semibold text-ink">
+                          <Montant>{formatCurrency(group.totalMonthlyPayment)}</Montant>
+                        </span>
+                        /mois
+                      </span>
+                      {group.averageInterestRate > 0 && (
+                        <>
+                          <span className="text-ink-faint">·</span>
+                          <span className="text-ink-faint">
+                            Taux moy. {group.averageInterestRate}%
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 pt-1">
+                    {group.loans.map((loan) => (
+                       <LoanCard key={loan.id} loan={loan} />
+                     ))}
+                   </div>
+                </div>
+              ))}
             </section>
           </>
         )}

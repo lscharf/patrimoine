@@ -43,6 +43,13 @@
       "when": 1787931214044,
       "tag": "0005_warm_stranger",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1787932019638,
+      "tag": "0006_amazing_veda",
+      "breakpoints": true
     }
   ]
 }

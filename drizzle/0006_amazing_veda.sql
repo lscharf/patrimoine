@@ -1,0 +1,1 @@
+ALTER TABLE `loans` ADD `group_name` text;

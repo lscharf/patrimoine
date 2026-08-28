@@ -63,14 +63,15 @@ export interface LoanInitial {
   startDate: string;
   customMonthlyPayment?: number | null;
   currentBalance?: number | null;
+  groupName?: string | null;
   accountId?: number | null;
-  holdingId?: number | null;
   notes?: string | null;
 }
 
 export interface LoanDialogProps {
   initial?: LoanInitial | LoanSummary;
   accounts?: Array<{ id: number; name: string }>;
+  availableGroupNames?: string[];
   trigger?: React.ReactNode;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
@@ -80,11 +81,13 @@ export interface LoanDialogProps {
 function LoanForm({
   initial,
   accounts = [],
+  availableGroupNames = [],
   onDone,
   onSaved,
 }: {
   initial?: LoanInitial | LoanSummary;
   accounts?: Array<{ id: number; name: string }>;
+  availableGroupNames?: string[];
   onDone: () => void;
   onSaved?: (loanId?: number) => void;
 }) {
@@ -118,6 +121,7 @@ function LoanForm({
   const [currentBalance, setCurrentBalance] = React.useState(
     initial?.currentBalance != null ? String(initial.currentBalance) : "",
   );
+  const [groupName, setGroupName] = React.useState(initial?.groupName ?? "");
   const [accountId, setAccountId] = React.useState<string>(
     initial?.accountId ? String(initial.accountId) : "none",
   );
@@ -155,6 +159,7 @@ function LoanForm({
       currentBalance: currentBalance
         ? currentBalance.replace(",", ".")
         : undefined,
+      groupName: groupName.trim() || undefined,
       accountId: accountId !== "none" ? Number(accountId) : null,
       notes: notes || undefined,
     };
@@ -362,6 +367,28 @@ function LoanForm({
             onChange={(e) => setCurrentBalance(e.target.value)}
           />
         </div>
+        <div className="space-y-1.5 sm:col-span-2">
+          <Label htmlFor="loan-group-name">
+            Groupe / Projet
+            <span className="ml-1 text-xs text-ink-faint">
+              (optionnel, ex: &quot;Résidence Principale&quot; pour regrouper prêt immo + PTZ)
+            </span>
+          </Label>
+          <Input
+            id="loan-group-name"
+            list="loan-group-suggestions"
+            placeholder="Ex : Résidence Principale, Investissement Locatif..."
+            value={groupName}
+            onChange={(e) => setGroupName(e.target.value)}
+          />
+          {availableGroupNames.length > 0 && (
+            <datalist id="loan-group-suggestions">
+              {availableGroupNames.map((g) => (
+                <option key={g} value={g} />
+              ))}
+            </datalist>
+          )}
+        </div>
 
         {accounts.length > 0 && (
           <div className="space-y-1.5 sm:col-span-2">
@@ -430,7 +457,7 @@ function LoanForm({
             ? "Enregistrement..."
             : initial?.id
               ? "Enregistrer les modifications"
-              : "Créer l'emprunt"}
+              : "Créer l&apos;emprunt"}
         </Button>
       </DialogFooter>
     </form>
@@ -440,6 +467,7 @@ function LoanForm({
 export function LoanDialog({
   initial,
   accounts = [],
+  availableGroupNames = [],
   trigger,
   open: openProp,
   onOpenChange,
@@ -468,6 +496,7 @@ export function LoanDialog({
           <LoanForm
             initial={initial}
             accounts={accounts}
+            availableGroupNames={availableGroupNames}
             onDone={() => setOpen(false)}
             onSaved={onSaved}
           />

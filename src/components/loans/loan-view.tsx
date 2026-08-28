@@ -73,6 +73,7 @@ export function LoanView({ loan, accounts }: LoanViewProps) {
   const [accountId, setAccountId] = React.useState<string>(
     loan.accountId ? String(loan.accountId) : "none",
   );
+  const [groupName, setGroupName] = React.useState(loan.groupName ?? "");
   const [notes, setNotes] = React.useState(loan.notes ?? "");
 
   const endDateFormatted = loan.endDate
@@ -103,6 +104,7 @@ export function LoanView({ loan, accounts }: LoanViewProps) {
       currentBalance: currentBalance
         ? currentBalance.replace(",", ".")
         : undefined,
+      groupName: groupName.trim() || undefined,
       accountId: accountId !== "none" ? Number(accountId) : null,
       notes: notes || undefined,
     };
@@ -544,6 +546,17 @@ export function LoanView({ loan, accounts }: LoanViewProps) {
                     inputMode="decimal"
                     value={initialFees}
                     onChange={(e) => setInitialFees(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1.5 sm:col-span-2">
+                  <Label htmlFor="param-group">
+                    Groupe / Projet <span className="text-xs text-ink-faint">(Optionnel, ex: Résidence Principale)</span>
+                  </Label>
+                  <Input
+                    id="param-group"
+                    placeholder="Ex : Résidence Principale, Investissement Locatif..."
+                    value={groupName}
+                    onChange={(e) => setGroupName(e.target.value)}
                   />
                 </div>
               </div>

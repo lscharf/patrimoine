@@ -167,6 +167,7 @@ export const loanInput = z.object({
   startDate: isoDay,
   customMonthlyPayment: nonNegative.optional(),
   currentBalance: nonNegative.nullable().optional(),
+  groupName: z.string().trim().max(100).optional().or(z.literal("")),
   accountId: z.coerce.number().int().positive().nullable().optional(),
   holdingId: z.coerce.number().int().positive().nullable().optional(),
   notes: z.string().trim().max(500).optional().or(z.literal("")),
