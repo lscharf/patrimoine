@@ -147,17 +147,38 @@ export function computeLoanDetail(
   const referenceDate =
     options?.referenceDate ?? new Date().toISOString().slice(0, 10);
 
-  const schedule = generateAmortizationSchedule(loan);
+  const rawSchedule = generateAmortizationSchedule(loan);
   const type = (loan.type as LoanType) || "AMORTIZING";
   const endDate =
-    schedule.length > 0
-      ? schedule[schedule.length - 1].date
+    rawSchedule.length > 0
+      ? rawSchedule[rawSchedule.length - 1].date
       : addMonthsToIsoDate(loan.startDate, loan.durationMonths);
 
   // Déterminer les échéances passées et futures
-  const pastInstallments = schedule.filter((row) => row.date <= referenceDate);
+  const pastInstallments = rawSchedule.filter((row) => row.date <= referenceDate);
   const paidCount = pastInstallments.length;
-  const remainingCount = Math.max(0, schedule.length - paidCount);
+  const remainingCount = Math.max(0, rawSchedule.length - paidCount);
+
+  // Calibrage du tableau d'amortissement si un solde actuel spécifique est renseigné
+  const schedule: AmortizationScheduleRow[] = [];
+  let remainingAfterCalibration =
+    loan.currentBalance != null && loan.currentBalance >= 0
+      ? loan.currentBalance
+      : (pastInstallments.length > 0
+          ? pastInstallments[pastInstallments.length - 1].remainingPrincipal
+          : loan.borrowedAmount);
+
+  for (let i = 0; i < rawSchedule.length; i++) {
+    const row = { ...rawSchedule[i] };
+    if (i < paidCount) {
+      schedule.push(row);
+    } else {
+      const principalPart = Math.min(remainingAfterCalibration, row.principalPayment);
+      remainingAfterCalibration = Math.max(0, remainingAfterCalibration - principalPart);
+      row.remainingPrincipal = Number(remainingAfterCalibration.toFixed(2));
+      schedule.push(row);
+    }
+  }
 
   const lastPayment = pastInstallments.length > 0 ? pastInstallments[pastInstallments.length - 1] : null;
   const nextPayment = paidCount < schedule.length ? schedule[paidCount] : null;
@@ -328,32 +349,55 @@ export function computeLiabilitiesSummary(
       ? Number((weightedRateSum / totalRemainingCapital).toFixed(2))
       : 0;
 
-  // Calcul d'une courbe globale consolidée de passif dans le temps
-  const dateMap = new Map<string, number>();
-  for (const d of details) {
-    for (const pt of d.schedule) {
-      const existing = dateMap.get(pt.date) ?? 0;
-      dateMap.set(pt.date, existing + pt.remainingPrincipal);
-    }
-  }
+  // Calcul d'une courbe globale consolidée de passif mois par mois (1 mesure par mois, strictement lissée)
+  const todayIso = referenceDate ?? new Date().toISOString().slice(0, 10);
+  const [refY, refM] = todayIso.split("-").map(Number);
 
-  // Trier par date
-  const sortedDates = Array.from(dateMap.keys()).sort();
+  let maxEndDate = todayIso;
+  for (const d of details) {
+    if (d.endDate > maxEndDate) maxEndDate = d.endDate;
+  }
+  const [maxY, maxM] = maxEndDate.split("-").map(Number);
+  const totalMonthsSpan = Math.max(1, (maxY - refY) * 12 + (maxM - refM));
+
   const chartPoints: SeriesPoint[] = [];
 
-  const todayIso = referenceDate ?? new Date().toISOString().slice(0, 10);
   const todayEpoch = new Date(`${todayIso}T00:00:00Z`).getTime();
   if (!Number.isNaN(todayEpoch)) {
     chartPoints.push({ t: todayEpoch, v: Number(totalRemainingCapital.toFixed(2)) });
   }
 
-  for (const date of sortedDates) {
-    const epoch = new Date(`${date}T00:00:00Z`).getTime();
+  for (let offset = 1; offset <= totalMonthsSpan; offset++) {
+    const d = new Date(Date.UTC(refY, refM - 1 + offset, 1));
+    const yearMonth = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+
+    let totalMonthCap = 0;
+    for (const item of details) {
+      const startYM = item.startDate.slice(0, 7);
+      const endYM = item.endDate.slice(0, 7);
+
+      if (yearMonth < startYM) {
+        totalMonthCap += item.borrowedAmount;
+      } else if (yearMonth > endYM) {
+        totalMonthCap += 0;
+      } else {
+        const row = item.schedule.find((r) => r.date.slice(0, 7) === yearMonth);
+        if (row) {
+          totalMonthCap += row.remainingPrincipal;
+        } else {
+          const rowsBefore = item.schedule.filter((r) => r.date.slice(0, 7) <= yearMonth);
+          if (rowsBefore.length > 0) {
+            totalMonthCap += rowsBefore[rowsBefore.length - 1].remainingPrincipal;
+          }
+        }
+      }
+    }
+
+    const epoch = new Date(`${yearMonth}-01T00:00:00Z`).getTime();
     if (!Number.isNaN(epoch) && epoch > todayEpoch) {
-      chartPoints.push({ t: epoch, v: Number((dateMap.get(date) ?? 0).toFixed(2)) });
+      chartPoints.push({ t: epoch, v: Number(totalMonthCap.toFixed(2)) });
     }
   }
-
   return {
     totalRemainingCapital: Number(totalRemainingCapital.toFixed(2)),
     totalBorrowedAmount: Number(totalBorrowedAmount.toFixed(2)),
