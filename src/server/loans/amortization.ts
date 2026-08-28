@@ -80,11 +80,10 @@ export function generateAmortizationSchedule(loan: {
     type,
   );
 
-  // Si une mensualité personnalisée est fournie et > assurance, on adapte la part de base
+  // Si une mensualité personnalisée est fournie et > assurance, elle prévaut
   if (
     loan.customMonthlyPayment &&
-    loan.customMonthlyPayment > monthlyInsurance &&
-    type === "AMORTIZING"
+    loan.customMonthlyPayment > monthlyInsurance
   ) {
     calculatedBaseMonthly = loan.customMonthlyPayment - monthlyInsurance;
   }
@@ -101,7 +100,11 @@ export function generateAmortizationSchedule(loan: {
       principalPayment = m === duration ? remainingPrincipal : 0;
     } else if (type === "PTZ" || loan.interestRate <= 0) {
       interest = 0;
-      principalPayment = m === duration ? remainingPrincipal : principal / duration;
+      if (loan.customMonthlyPayment && loan.customMonthlyPayment > monthlyInsurance) {
+        principalPayment = Math.min(remainingPrincipal, calculatedBaseMonthly);
+      } else {
+        principalPayment = m === duration ? remainingPrincipal : principal / duration;
+      }
     } else {
       // Amortissable standard
       interest = remainingPrincipal * monthlyInterestRate;
