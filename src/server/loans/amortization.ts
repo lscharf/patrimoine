@@ -161,13 +161,14 @@ export function computeLoanDetail(
 
   // Capital restant dû actuel
   let currentRemainingCapital = loan.borrowedAmount;
-  if (lastPayment) {
+  if (loan.currentBalance != null && loan.currentBalance >= 0) {
+    currentRemainingCapital = loan.currentBalance;
+  } else if (lastPayment) {
     currentRemainingCapital = lastPayment.remainingPrincipal;
   }
   if (paidCount >= schedule.length) {
     currentRemainingCapital = 0;
   }
-
   // Cumuls payés
   let paidCapital = 0;
   let paidInterest = 0;
@@ -176,6 +177,9 @@ export function computeLoanDetail(
     paidCapital += row.principalPayment;
     paidInterest += row.interestPayment;
     paidInsurance += row.insurancePayment;
+  }
+  if (loan.currentBalance != null && loan.currentBalance >= 0) {
+    paidCapital = Math.max(0, loan.borrowedAmount - loan.currentBalance);
   }
   const totalPaid = paidCapital + paidInterest + paidInsurance;
 
@@ -241,6 +245,7 @@ export function computeLoanDetail(
     startDate: loan.startDate,
     endDate,
     customMonthlyPayment: loan.customMonthlyPayment,
+    currentBalance: loan.currentBalance ?? null,
     notes: loan.notes,
     accountId: loan.accountId,
     holdingId: loan.holdingId,
@@ -265,7 +270,6 @@ export function computeLoanDetail(
     paidInterest: Number(paidInterest.toFixed(2)),
     paidInsurance: Number(paidInsurance.toFixed(2)),
     totalPaid: Number(totalPaid.toFixed(2)),
-
     totalInterest: Number(totalInterest.toFixed(2)),
     totalInsurance: Number(totalInsurance.toFixed(2)),
     totalCost: Number(totalCost.toFixed(2)),

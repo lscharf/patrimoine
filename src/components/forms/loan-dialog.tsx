@@ -62,6 +62,7 @@ export interface LoanInitial {
   durationMonths: number;
   startDate: string;
   customMonthlyPayment?: number | null;
+  currentBalance?: number | null;
   accountId?: number | null;
   holdingId?: number | null;
   notes?: string | null;
@@ -114,6 +115,9 @@ function LoanForm({
   const [customMonthlyPayment, setCustomMonthlyPayment] = React.useState(
     initial?.customMonthlyPayment ? String(initial.customMonthlyPayment) : "",
   );
+  const [currentBalance, setCurrentBalance] = React.useState(
+    initial?.currentBalance != null ? String(initial.currentBalance) : "",
+  );
   const [accountId, setAccountId] = React.useState<string>(
     initial?.accountId ? String(initial.accountId) : "none",
   );
@@ -147,6 +151,9 @@ function LoanForm({
       startDate,
       customMonthlyPayment: customMonthlyPayment
         ? customMonthlyPayment.replace(",", ".")
+        : undefined,
+      currentBalance: currentBalance
+        ? currentBalance.replace(",", ".")
         : undefined,
       accountId: accountId !== "none" ? Number(accountId) : null,
       notes: notes || undefined,
@@ -337,6 +344,22 @@ function LoanForm({
             }
             value={customMonthlyPayment}
             onChange={(e) => setCustomMonthlyPayment(e.target.value)}
+          />
+        </div>
+        <div className="space-y-1.5 sm:col-span-2">
+          <Label htmlFor="loan-current-balance">
+            Capital restant dû actuel (€)
+            <span className="ml-1 text-xs text-ink-faint">
+              (optionnel, calibré sur votre banque — calculé si vide)
+            </span>
+          </Label>
+          <Input
+            id="loan-current-balance"
+            type="text"
+            inputMode="decimal"
+            placeholder="Laisser vide pour calcul automatique selon l&apos;échéancier"
+            value={currentBalance}
+            onChange={(e) => setCurrentBalance(e.target.value)}
           />
         </div>
 

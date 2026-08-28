@@ -166,6 +166,7 @@ export const loanInput = z.object({
     .max(600, "Durée maximale 50 ans"),
   startDate: isoDay,
   customMonthlyPayment: nonNegative.optional(),
+  currentBalance: nonNegative.nullable().optional(),
   accountId: z.coerce.number().int().positive().nullable().optional(),
   holdingId: z.coerce.number().int().positive().nullable().optional(),
   notes: z.string().trim().max(500).optional().or(z.literal("")),

@@ -67,6 +67,9 @@ export function LoanView({ loan, accounts }: LoanViewProps) {
   const [customMonthlyPayment, setCustomMonthlyPayment] = React.useState(
     loan.customMonthlyPayment ? String(loan.customMonthlyPayment) : "",
   );
+  const [currentBalance, setCurrentBalance] = React.useState(
+    loan.currentBalance != null ? String(loan.currentBalance) : "",
+  );
   const [accountId, setAccountId] = React.useState<string>(
     loan.accountId ? String(loan.accountId) : "none",
   );
@@ -96,6 +99,9 @@ export function LoanView({ loan, accounts }: LoanViewProps) {
       startDate,
       customMonthlyPayment: customMonthlyPayment
         ? customMonthlyPayment.replace(",", ".")
+        : undefined,
+      currentBalance: currentBalance
+        ? currentBalance.replace(",", ".")
         : undefined,
       accountId: accountId !== "none" ? Number(accountId) : null,
       notes: notes || undefined,
@@ -586,6 +592,22 @@ export function LoanView({ loan, accounts }: LoanViewProps) {
                     placeholder={`Calculée : ${loan.monthlyPayment} €`}
                     value={customMonthlyPayment}
                     onChange={(e) => setCustomMonthlyPayment(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1.5 sm:col-span-2">
+                  <Label htmlFor="param-balance">
+                    Capital restant dû actuel (€){" "}
+                    <span className="text-xs text-ink-faint">
+                      (optionnel, calibré sur votre banque — calculé si vide)
+                    </span>
+                  </Label>
+                  <Input
+                    id="param-balance"
+                    type="text"
+                    inputMode="decimal"
+                    placeholder="Laisser vide pour calcul automatique selon l&apos;échéancier"
+                    value={currentBalance}
+                    onChange={(e) => setCurrentBalance(e.target.value)}
                   />
                 </div>
               </div>
