@@ -1,8 +1,7 @@
 # Patrimoine 💼
 
 > **Suivi de patrimoine financier personnel, auto-hébergé, souverain et sans télémétrie.**
-> Centralisez vos comptes (PEA, compte-titres, crypto, épargne salariale, livrets), suivez vos cours de marché en temps réel et visualisez votre performance réelle nette d'apports.
-
+> Centralisez vos comptes (PEA, compte-titres, crypto, épargne salariale, livrets), suivez vos crédits et emprunts (Passif), visualisez vos cours en temps réel et pilotez votre patrimoine net réel.
 [![Docker Image](https://img.shields.io/badge/Docker-ghcr.io%2Flscharf%2Fpatrimoine-blue?logo=docker&logoColor=white)](https://github.com/lscharf/patrimoine/pkgs/container/patrimoine)
 [![Next.js](https://img.shields.io/badge/Next.js-16-black?logo=next.js)](https://nextjs.org/)
 [![React](https://img.shields.io/badge/React-19-61dafb?logo=react&logoColor=black)](https://react.dev/)
@@ -24,13 +23,20 @@
   - Gestion multi-devises avec conversion au taux de change historique du jour de chaque transaction pour isoler fidèlement l'effet de change.
 - **Courbe de performance réelle (1J à TOUT)** :
   - Performance calculée **nette des apports et retraits** : un versement de 500 € n'apparaît pas artificiellement comme un gain.
+- **Passif & Gestion des Emprunts (expérience complète type Finary)** :
+  - Prise en charge des crédits immobiliers, prêts à la consommation, PTZ (Prêt à Taux Zéro) et prêts in fine.
+  - **Regroupement par projet** : regroupez par exemple le prêt principal et le PTZ sous un même projet (*Résidence Principale*) avec totaux de capital restant dû et mensualités consolidés.
+  - **Moteur d'amortissement précis** : calcul automatique de l'échéancier mois par mois, part capital / intérêts / assurance, et courbe d'extinction de la dette.
+  - **Vue détaillée à 3 onglets** :
+    - *Aperçu* : grand montant du capital restant dû, phrase d'état, courbe interactive d'amortissement et indicateurs clés.
+    - *Analyse* : donut de répartition de la mensualité, décomposition du coût total, total remboursé et échéancier complet.
+    - *Paramètres* : modification des caractéristiques et possibilité de calibrer le solde au centime près sur vos relevés bancaires.
+  - **Calcul du Patrimoine Net** : $\text{Patrimoine Net} = \text{Actifs Bruts} - \text{Passif / Dettes}$ affiché en temps réel sur le tableau de bord.
 - **Mode discrétion (Privacy)** :
   - Masquage des montants d'un clic pour partager ou montrer son écran en public sans dévoiler ses chiffres (injecté dès le rendu serveur sans flash visuel).
 - **Intégrations & API** :
   - Endpoint REST `/api/summary` pour connecter des widgets de bureau ou scripts personnels.
   - Widget natif pour la barre d'état Linux : [**Plugin Omarchy Bar**](https://github.com/lscharf/patrimoine.plugin).
-
----
 
 ## Principes d'architecture
 
