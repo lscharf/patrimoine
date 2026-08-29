@@ -7,6 +7,7 @@ import {
   instruments,
   loans,
   manualValues,
+  realEstateProperties,
   transactions,
 } from "@/db/schema";
 import type { Instrument, Transaction } from "@/db/schema";
@@ -17,6 +18,7 @@ import {
   refreshQuotes,
 } from "@/server/prices/cache";
 import { computeLiabilitiesSummary } from "@/server/loans/amortization";
+import { computeRealEstateSummary } from "@/server/real-estate/calculations";
 import { computeCostBasis } from "./cost-basis";
 import type {
   AccountSnapshot,
@@ -272,11 +274,27 @@ export async function buildSnapshot(userId: string): Promise<PortfolioSnapshot> 
   const userLoans = db.select().from(loans).where(eq(loans.userId, userId)).all();
   const liabilities = computeLiabilitiesSummary(userLoans);
   const totalLiabilities = liabilities.totalRemainingCapital;
-  const netWorth = totalValue - totalLiabilities;
+
+  const userProperties = db
+    .select()
+    .from(realEstateProperties)
+    .where(eq(realEstateProperties.userId, userId))
+    .all();
+  const realEstateSummary = computeRealEstateSummary(
+    userProperties,
+    liabilities.loans,
+  );
+  const realEstateValue = realEstateSummary.totalGrossValue;
+  const realEstateNetEquity = realEstateSummary.totalNetEquity;
+  const grossAssets = totalValue + realEstateValue;
+  const netWorth = grossAssets - totalLiabilities;
 
   return {
     totalValue,
-    grossAssets: totalValue,
+    realEstateValue,
+    realEstateNetEquity,
+    realEstatePropertiesCount: realEstateSummary.propertiesCount,
+    grossAssets,
     totalLiabilities,
     netWorth,
     monthlyLoanPayment: liabilities.totalMonthlyPayment,

@@ -52,12 +52,83 @@ export const LOAN_KIND_LABELS: Record<
   (typeof LOAN_KINDS)[number],
   string
 > = {
-  AMORTIZING: "Prêt amortissable (standard)",
+  AMORTIZING: "Prêt amortissable",
   IN_FINE: "Prêt in fine",
-  PTZ: "Prêt à taux zéro (PTZ)",
-  OTHER: "Autre prêt",
+  PTZ: "Prêt à taux zéro",
+  OTHER: "Autre crédit",
 };
 
+export const PROPERTY_TYPES = [
+  "APPARTEMENT",
+  "MAISON",
+  "TERRAIN",
+  "PARKING",
+  "IMMEUBLE",
+  "LOCAL_COMMERCIAL",
+  "AUTRE",
+] as const;
+
+export const PROPERTY_TYPE_LABELS: Record<
+  (typeof PROPERTY_TYPES)[number],
+  string
+> = {
+  APPARTEMENT: "Appartement",
+  MAISON: "Maison",
+  TERRAIN: "Terrain",
+  PARKING: "Parking / Box",
+  IMMEUBLE: "Immeuble",
+  LOCAL_COMMERCIAL: "Local commercial",
+  AUTRE: "Autre bien",
+};
+
+export const PROPERTY_CATEGORIES = [
+  "RESIDENCE_PRINCIPALE",
+  "RESIDENCE_SECONDAIRE",
+  "LOCATIF",
+  "AUTRE",
+] as const;
+
+export const PROPERTY_CATEGORY_LABELS: Record<
+  (typeof PROPERTY_CATEGORIES)[number],
+  string
+> = {
+  RESIDENCE_PRINCIPALE: "Résidence principale",
+  RESIDENCE_SECONDAIRE: "Résidence secondaire",
+  LOCATIF: "Investissement locatif",
+  AUTRE: "Autre usage",
+};
+
+export const ROOM_QUALITIES = [
+  "STANDARD",
+  "HIGH_END",
+  "EXCEPTIONAL",
+] as const;
+
+export const ROOM_QUALITY_LABELS: Record<
+  (typeof ROOM_QUALITIES)[number],
+  string
+> = {
+  STANDARD: "Standard",
+  HIGH_END: "Haut de gamme",
+  EXCEPTIONAL: "Matériaux d'exception",
+};
+
+export const ROOM_CONDITIONS = [
+  "TO_RENOVATE",
+  "GOOD",
+  "WELL_MAINTAINED",
+  "NEW",
+] as const;
+
+export const ROOM_CONDITION_LABELS: Record<
+  (typeof ROOM_CONDITIONS)[number],
+  string
+> = {
+  TO_RENOVATE: "À rénover",
+  GOOD: "Bon état",
+  WELL_MAINTAINED: "Bien entretenu",
+  NEW: "Neuf ou récemment rénové",
+};
 const isoDay = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}$/, "Date attendue au format AAAA-MM-JJ");
@@ -170,7 +241,51 @@ export const loanInput = z.object({
   groupName: z.string().trim().max(100).optional().or(z.literal("")),
   accountId: z.coerce.number().int().positive().nullable().optional(),
   holdingId: z.coerce.number().int().positive().nullable().optional(),
+  propertyId: z.coerce.number().int().positive().nullable().optional(),
   notes: z.string().trim().max(500).optional().or(z.literal("")),
+});
+
+export const propertyInput = z.object({
+  name: z.string().trim().min(1, "Le nom est obligatoire").max(150),
+  description: z.string().trim().max(500).optional().or(z.literal("")),
+  type: z.enum(PROPERTY_TYPES).default("APPARTEMENT"),
+  category: z.enum(PROPERTY_CATEGORIES).default("RESIDENCE_PRINCIPALE"),
+  address: z.string().trim().max(250).optional().or(z.literal("")),
+  city: z.string().trim().max(100).optional().or(z.literal("")),
+  zipcode: z.string().trim().max(20).optional().or(z.literal("")),
+  surface: nonNegative,
+  purchasePrice: nonNegative,
+  purchaseDate: isoDay.optional().or(z.literal("")),
+  notaryFees: nonNegative.optional(),
+  renovationCosts: nonNegative.optional(),
+  estimatedValue: nonNegative,
+  monthlyRent: nonNegative.optional(),
+  condoFees: nonNegative.optional(),
+  propertyTax: nonNegative.optional(),
+  floor: z.coerce.number().int().nullable().optional(),
+  totalFloors: z.coerce.number().int().nullable().optional(),
+  rooms: z.coerce.number().int().min(1).default(1),
+  bedrooms: z.coerce.number().int().min(0).default(1),
+  bathrooms: z.coerce.number().int().min(0).default(1),
+  garages: z.coerce.number().int().min(0).default(0),
+  parkingSpots: z.coerce.number().int().min(0).default(0),
+  gardenSurface: nonNegative.optional(),
+  terraceSurface: nonNegative.optional(),
+  hasElevator: z.boolean().default(false),
+  isNew: z.boolean().default(false),
+  isFurnished: z.boolean().default(false),
+  kitchenQuality: z.string().optional().or(z.literal("")),
+  kitchenCondition: z.string().optional().or(z.literal("")),
+  bathroomQuality: z.string().optional().or(z.literal("")),
+  bathroomCondition: z.string().optional().or(z.literal("")),
+  flooringQuality: z.string().optional().or(z.literal("")),
+  flooringCondition: z.string().optional().or(z.literal("")),
+  windowsQuality: z.string().optional().or(z.literal("")),
+  windowsCondition: z.string().optional().or(z.literal("")),
+  generalQuality: z.string().optional().or(z.literal("")),
+  generalCondition: z.string().optional().or(z.literal("")),
+  ownershipPct: z.coerce.number().min(0).max(100).default(100),
+  coOwners: z.string().optional().or(z.literal("")),
 });
 
 export type AccountInput = z.infer<typeof accountInput>;
@@ -179,3 +294,4 @@ export type ManualHoldingInput = z.infer<typeof manualHoldingInput>;
 export type TransactionInput = z.infer<typeof transactionInput>;
 export type ManualValueInput = z.infer<typeof manualValueInput>;
 export type LoanInput = z.infer<typeof loanInput>;
+export type PropertyInput = z.infer<typeof propertyInput>;

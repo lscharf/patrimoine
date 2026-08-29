@@ -86,8 +86,15 @@ export type AccountSnapshot = {
 };
 
 export type PortfolioSnapshot = {
-  /** Valeur brute totale des actifs (comptes, investissements) */
+  /** Valeur brute totale des actifs financiers (comptes, investissements) */
   totalValue: number;
+  /** Valeur brute totale des actifs immobiliers */
+  realEstateValue: number;
+  /** Valeur nette immobilière (après déduction des crédits rattachés) */
+  realEstateNetEquity: number;
+  /** Nombre de biens immobiliers */
+  realEstatePropertiesCount: number;
+  /** Total des actifs bruts (financier + immobilier) */
   grossAssets: number;
   /** Total du passif (capital restant dû sur les emprunts) */
   totalLiabilities: number;
@@ -110,7 +117,6 @@ export type PortfolioSnapshot = {
   holdings: HoldingSnapshot[];
   updatedAt: number;
 };
-
 /** Point de la courbe : timestamp epoch ms, valeur en euros */
 export type SeriesPoint = { t: number; v: number };
 

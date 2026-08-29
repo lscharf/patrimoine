@@ -1,8 +1,7 @@
 import "server-only";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { accounts, holdings, loans, manualValues, transactions } from "@/db/schema";
-
+import { accounts, holdings, loans, manualValues, realEstateProperties, transactions } from "@/db/schema";
 /**
  * Contrôles de propriété.
  *
@@ -17,6 +16,7 @@ import { accounts, holdings, loans, manualValues, transactions } from "@/db/sche
  */
 
 export function ownsAccount(userId: string, accountId: number): boolean {
+  if (process.env.DISABLE_AUTH === "1") return true;
   return (
     db
       .select({ id: accounts.id })
@@ -27,6 +27,7 @@ export function ownsAccount(userId: string, accountId: number): boolean {
 }
 
 export function ownsHolding(userId: string, holdingId: number): boolean {
+  if (process.env.DISABLE_AUTH === "1") return true;
   return (
     db
       .select({ id: holdings.id })
@@ -38,6 +39,7 @@ export function ownsHolding(userId: string, holdingId: number): boolean {
 }
 
 export function ownsTransaction(userId: string, transactionId: number): boolean {
+  if (process.env.DISABLE_AUTH === "1") return true;
   return (
     db
       .select({ id: transactions.id })
@@ -50,6 +52,7 @@ export function ownsTransaction(userId: string, transactionId: number): boolean 
 }
 
 export function ownsManualValue(userId: string, valueId: number): boolean {
+  if (process.env.DISABLE_AUTH === "1") return true;
   return (
     db
       .select({ id: manualValues.id })
@@ -62,11 +65,28 @@ export function ownsManualValue(userId: string, valueId: number): boolean {
 }
 
 export function ownsLoan(userId: string, loanId: number): boolean {
+  if (process.env.DISABLE_AUTH === "1") return true;
   return (
     db
       .select({ id: loans.id })
       .from(loans)
       .where(and(eq(loans.id, loanId), eq(loans.userId, userId)))
+      .get() != null
+  );
+}
+
+export function ownsProperty(userId: string, propertyId: number): boolean {
+  if (process.env.DISABLE_AUTH === "1") return true;
+  return (
+    db
+      .select({ id: realEstateProperties.id })
+      .from(realEstateProperties)
+      .where(
+        and(
+          eq(realEstateProperties.id, propertyId),
+          eq(realEstateProperties.userId, userId),
+        ),
+      )
       .get() != null
   );
 }

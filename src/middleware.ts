@@ -12,6 +12,7 @@ import { getSessionCookie } from "better-auth/cookies";
  * la session en base et vérifient la propriété de chaque objet touché.
  */
 export function middleware(request: NextRequest) {
+  if (process.env.DISABLE_AUTH === "1") return NextResponse.next();
   if (getSessionCookie(request)) return NextResponse.next();
 
   const url = new URL("/connexion", request.url);

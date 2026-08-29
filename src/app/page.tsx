@@ -68,7 +68,7 @@ export default async function DashboardPage({
     <>
       <SiteHeader active="/" />
       <main className="mx-auto w-full max-w-6xl flex-1 space-y-5 px-4 py-6 sm:px-6 sm:py-8">
-        {snapshot.totalLiabilities > 0 && (
+        {(snapshot.totalLiabilities > 0 || snapshot.realEstateValue > 0) && (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <div className="rounded-card border border-hairline bg-surface p-4">
               <p className="text-[11px] font-medium uppercase tracking-wider text-ink-faint">
@@ -79,17 +79,23 @@ export default async function DashboardPage({
               </p>
               <p className="mt-1 text-xs text-ink-muted">Actifs bruts − Dettes</p>
             </div>
-            <div className="rounded-card border border-hairline bg-surface p-4">
-              <p className="text-[11px] font-medium uppercase tracking-wider text-ink-faint">
-                Actifs bruts
+            <Link
+              href="/immobilier"
+              className="group rounded-card border border-hairline bg-surface p-4 transition-colors hover:border-hairline-strong"
+            >
+              <p className="text-[11px] font-medium uppercase tracking-wider text-ink-faint group-hover:text-accent transition-colors">
+                Immobilier →
               </p>
               <p className="tnum mt-1 text-2xl font-bold tracking-tight text-ink">
-                <Montant>{formatCurrency(snapshot.grossAssets)}</Montant>
+                <Montant>{formatCurrency(snapshot.realEstateValue)}</Montant>
               </p>
               <p className="mt-1 text-xs text-ink-muted">
-                {snapshot.holdings.length} ligne{snapshot.holdings.length > 1 ? "s" : ""}
+                {snapshot.realEstatePropertiesCount} bien{snapshot.realEstatePropertiesCount > 1 ? "s" : ""}
+                {snapshot.realEstateNetEquity > 0 && (
+                  <span> · Net {formatCurrency(snapshot.realEstateNetEquity)}</span>
+                )}
               </p>
-            </div>
+            </Link>
             <Link
               href="/emprunts"
               className="group rounded-card border border-hairline bg-surface p-4 transition-colors hover:border-hairline-strong"

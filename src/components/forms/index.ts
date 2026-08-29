@@ -33,3 +33,7 @@ export {
   type LoanDialogProps,
   type LoanInitial,
 } from "./loan-dialog";
+export {
+  PropertyDialog,
+  type PropertyDialogProps,
+} from "./property-dialog";

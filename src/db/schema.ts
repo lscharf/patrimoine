@@ -202,6 +202,77 @@ export const fxState = sqliteTable("fx_state", {
 });
 
 /* ------------------------------------------------------------------ *
+ * Biens Immobiliers — "Appartement Schiltigheim", "Maison", etc.
+ * ------------------------------------------------------------------ */
+export const realEstateProperties = sqliteTable(
+  "real_estate_properties",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    userId: text("user_id").references(() => authUser.id, {
+      onDelete: "cascade",
+    }),
+    name: text("name").notNull(),
+    description: text("description"),
+    /** APPARTEMENT | MAISON | TERRAIN | PARKING | IMMEUBLE | LOCAL_COMMERCIAL | AUTRE */
+    type: text("type").notNull().default("APPARTEMENT"),
+    /** RESIDENCE_PRINCIPALE | RESIDENCE_SECONDAIRE | LOCATIF | AUTRE */
+    category: text("category").notNull().default("RESIDENCE_PRINCIPALE"),
+    address: text("address"),
+    city: text("city"),
+    zipcode: text("zipcode"),
+
+    // --- Caractéristiques financières & valorisation ---
+    surface: real("surface").notNull().default(0),
+    purchasePrice: real("purchase_price").notNull().default(0),
+    purchaseDate: text("purchase_date"),
+    notaryFees: real("notary_fees").notNull().default(0),
+    renovationCosts: real("renovation_costs").notNull().default(0),
+    estimatedValue: real("estimated_value").notNull().default(0),
+    monthlyRent: real("monthly_rent").notNull().default(0),
+    condoFees: real("condo_fees").notNull().default(0),
+    propertyTax: real("property_tax").notNull().default(0),
+
+    // --- Détails techniques du bien ---
+    floor: integer("floor"),
+    totalFloors: integer("total_floors"),
+    rooms: integer("rooms").notNull().default(1),
+    bedrooms: integer("bedrooms").notNull().default(1),
+    bathrooms: integer("bathrooms").notNull().default(1),
+    garages: integer("garages").notNull().default(0),
+    parkingSpots: integer("parking_spots").notNull().default(0),
+    gardenSurface: real("garden_surface").notNull().default(0),
+    terraceSurface: real("terrace_surface").notNull().default(0),
+    hasElevator: integer("has_elevator", { mode: "boolean" }).notNull().default(false),
+    isNew: integer("is_new", { mode: "boolean" }).notNull().default(false),
+    isFurnished: integer("is_furnished", { mode: "boolean" }).notNull().default(false),
+
+    // --- Pièces & Qualité / État ---
+    kitchenQuality: text("kitchen_quality"),
+    kitchenCondition: text("kitchen_condition"),
+    bathroomQuality: text("bathroom_quality"),
+    bathroomCondition: text("bathroom_condition"),
+    flooringQuality: text("flooring_quality"),
+    flooringCondition: text("flooring_condition"),
+    windowsQuality: text("windows_quality"),
+    windowsCondition: text("windows_condition"),
+    generalQuality: text("general_quality"),
+    generalCondition: text("general_condition"),
+
+    // --- Détention & Quote-part ---
+    ownershipPct: real("ownership_pct").notNull().default(100),
+    coOwners: text("co_owners"),
+
+    createdAt: integer("created_at")
+      .notNull()
+      .default(sql`(unixepoch() * 1000)`),
+    updatedAt: integer("updated_at")
+      .notNull()
+      .default(sql`(unixepoch() * 1000)`),
+  },
+  (t) => [index("real_estate_user_idx").on(t.userId)],
+);
+
+/* ------------------------------------------------------------------ *
  * Emprunts & Passif — "Prêt Immobilier", "Prêt Conso", "PTZ"...
  * ------------------------------------------------------------------ */
 export const loans = sqliteTable(
@@ -239,6 +310,10 @@ export const loans = sqliteTable(
     holdingId: integer("holding_id").references(() => holdings.id, {
       onDelete: "set null",
     }),
+    /** Bien immobilier lié (optionnel) */
+    propertyId: integer("property_id").references(() => realEstateProperties.id, {
+      onDelete: "set null",
+    }),
     /** Nom du groupe ou projet (ex: "Résidence Principale", "Investissement Locatif") */
     groupName: text("group_name"),
     notes: text("notes"),
@@ -249,7 +324,10 @@ export const loans = sqliteTable(
       .notNull()
       .default(sql`(unixepoch() * 1000)`),
   },
-  (t) => [index("loans_user_idx").on(t.userId)],
+  (t) => [
+    index("loans_user_idx").on(t.userId),
+    index("loans_property_idx").on(t.propertyId),
+  ],
 );
 
 export {
@@ -266,3 +344,4 @@ export type Holding = typeof holdings.$inferSelect;
 export type Transaction = typeof transactions.$inferSelect;
 export type ManualValue = typeof manualValues.$inferSelect;
 export type Loan = typeof loans.$inferSelect;
+export type RealEstateProperty = typeof realEstateProperties.$inferSelect;

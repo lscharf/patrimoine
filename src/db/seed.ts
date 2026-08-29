@@ -9,11 +9,14 @@
 import { db, sqlite } from "./index";
 import {
   accounts,
+  authUser,
   holdings,
-  manualValues,
-  transactions,
   instruments,
+  loans,
+  manualValues,
   priceBars,
+  realEstateProperties,
+  transactions,
   fxBars,
   fxState,
 } from "./schema";
@@ -36,6 +39,8 @@ async function main() {
       manualValues,
       transactions,
       holdings,
+      loans,
+      realEstateProperties,
       accounts,
       priceBars,
       fxBars,
@@ -52,6 +57,20 @@ async function main() {
     return;
   }
 
+  let user = db.select().from(authUser).all()[0];
+  if (!user) {
+    db.insert(authUser)
+      .values({
+        id: "demo_user",
+        name: "Léo Scharf",
+        email: "leo@scharf.fr",
+        emailVerified: true,
+      })
+      .run();
+    user = db.select().from(authUser).all()[0];
+  }
+  const userId = user.id;
+
   const mkAccount = (
     name: string,
     kind: string,
@@ -60,7 +79,7 @@ async function main() {
     position: number,
   ) => {
     db.insert(accounts)
-      .values({ name, kind, institution, color, position })
+      .values({ userId, name, kind, institution, color, position })
       .run();
     return db.select().from(accounts).all().at(-1)!;
   };
@@ -203,7 +222,73 @@ async function main() {
       { date: "2025-12-31", value: 5738 },
     ],
   );
+  // Bien immobilier de démonstration (Schiltigheim)
+  const prop = db
+    .insert(realEstateProperties)
+    .values({
+      userId,
+      name: "1 Rue de la Robertsau, 67300 Schiltigheim, France",
+      description:
+        "Appartement 3 pièces de 63 m² au 2ème et dernier étage d'une résidence 2017 RT 2012. Terrasse Sud-Ouest 9m² et garage fermé en sous-sol.",
+      category: "RESIDENCE_PRINCIPALE",
+      address: "1 Rue de la Robertsau, 67300 Schiltigheim, France",
+      city: "Schiltigheim",
+      zipcode: "67300",
+      surface: 63,
+      purchasePrice: 215000,
+      purchaseDate: "2017-09-15",
+      notaryFees: 15000,
+      renovationCosts: 8000,
+      estimatedValue: 255000,
+      floor: 2,
+      totalFloors: 2,
+      rooms: 3,
+      bedrooms: 2,
+      bathrooms: 1,
+      garages: 1,
+      parkingSpots: 0,
+      gardenSurface: 0,
+      terraceSurface: 9,
+      hasElevator: true,
+      isNew: true,
+      isFurnished: false,
+      kitchenQuality: "EXCEPTIONAL",
+      kitchenCondition: "NEW",
+      bathroomQuality: "HIGH_END",
+      bathroomCondition: "WELL_MAINTAINED",
+      flooringQuality: "HIGH_END",
+      flooringCondition: "WELL_MAINTAINED",
+      windowsQuality: "HIGH_END",
+      windowsCondition: "WELL_MAINTAINED",
+      generalQuality: "HIGH_END",
+      generalCondition: "WELL_MAINTAINED",
+      ownershipPct: 100,
+    })
+    .returning({ id: realEstateProperties.id })
+    .get();
 
+  console.log("Immobilier");
+  console.log("  ✓ 1 Rue de la Robertsau, Schiltigheim (T3 63m² - 255 000 €)");
+
+  // Crédit immobilier rattaché au bien
+  db.insert(loans)
+    .values({
+      userId,
+      name: "Crédit immobilier",
+      borrowedAmount: 180000,
+      downPayment: 50000,
+      initialFees: 1500,
+      interestRate: 1.45,
+      insuranceRate: 0.30,
+      durationMonths: 180,
+      startDate: "2017-10-05",
+      propertyId: prop.id,
+      groupName: "1 Rue de la Robertsau, 67300 Schiltigheim, France",
+      notes: "Prêt amortissable résidence principale",
+    })
+    .run();
+
+  console.log("  ✓ Crédit immobilier rattaché (180 000 € sur 15 ans)");
   console.log("\n✓ Jeu de démonstration installé.");
 }
 

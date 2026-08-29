@@ -47,10 +47,11 @@ patrimoine/
 │   │   ├── (dashboard)/page.tsx # Vue d'ensemble (Patrimoine, graphiques, allocation, lignes)
 │   │   ├── comptes/            # Liste des enveloppes / comptes
 │   │   │   └── [id]/page.tsx   # Détail d'un compte avec ses lignes et historique
+│   │   ├── immobilier/         # Vue d'ensemble du patrimoine immobilier
+│   │   │   └── [id]/page.tsx   # Détail Finary d'un bien (Aperçu, Analyse, Paramètres)
 │   │   ├── emprunts/           # Vue d'ensemble du passif et des crédits
 │   │   │   └── [id]/page.tsx   # Détail Finary d'un emprunt (Aperçu, Analyse, Paramètres)
 │   │   ├── lignes/[id]/page.tsx # Détail d'une ligne (métriques, valorisations, transactions)
-│   │   ├── transactions/page.tsx# Journal global de toutes les opérations
 │   │   ├── connexion/page.tsx  # Écran de connexion / onboarding premier run
 │   │   ├── api/auth/[...all]/  # Handler HTTP Better Auth
 │   │   └── api/health/route.ts # Healthcheck HTTP Docker (ne touche pas la DB)
@@ -123,9 +124,9 @@ erDiagram
   - `DIVIDEND` / `FEE` : flux de trésorerie associés (`amount`).
   - `DEPOSIT` / `WITHDRAWAL` : versements et retraits pour les lignes non cotées (`amount`).
 - **`manual_values`** : Historique des valorisations saisies pour les lignes non cotées (`holdingId`, `date`, `value`).
-- **`loans`** : Emprunts et crédits amortissables (`name`, `type`, `borrowedAmount`, `interestRate`, `insuranceRate`, `durationMonths`, `startDate`, `customMonthlyPayment`, etc.).
+- **`real_estate_properties`** : Biens immobiliers (`name`, `type`, `category`, `address`, `surface`, `purchasePrice`, `estimatedValue`, `monthlyRent`, `floor`, `rooms`, `garages`, `terraceSurface`, etc.).
+- **`loans`** : Emprunts et crédits amortissables (`name`, `type`, `borrowedAmount`, `interestRate`, `insuranceRate`, `durationMonths`, `startDate`, `customMonthlyPayment`, `propertyId`, etc.).
 - **`price_bars`** : Cache des clôtures quotidiennes (`instrumentId`, `date`, `close`). Clé primaire composite `(instrument_id, date)`.
-- **`fx_bars`** & **`fx_state`** : Cache des taux de change historiques et état de synchronisation vers l'euro (`pair`, `date`, `rate`).
 ### Tables d'authentification (`src/db/auth-schema.ts`)
 - **`auth_user`**, **`auth_session`**, **`auth_account`**, **`auth_verification`** (gérées par Better Auth avec Drizzle adapter).
 - Préfixées `auth_` pour ne pas entrer en collision avec `accounts` (comptes financiers).
@@ -176,8 +177,18 @@ $$\text{Performance (\%)} = \frac{\text{Performance (€)}}{V_{\text{start}} + \
   $$M_{\text{totale}} = M_{\text{base}} + M_{\text{assurance}}$$
 - **Échéancier complet** : Décomposition mois par mois (Capital amorti, Intérêts, Assurance, Capital restant dû).
 - **Patrimoine Net consolidé** :
-  $$\text{Patrimoine Net} = \text{Actifs Bruts} - \sum \text{Capital Restant Dû des Emprunts Actifs}$$
----
+  $$\text{Patrimoine Net} = \text{Actifs Bruts (Financier + Immobilier)} - \sum \text{Capital Restant Dû des Emprunts Actifs}$$
+
+### 5.6. Moteur Immobilier — `src/server/real-estate/calculations.ts`
+- **Patrimoine Net Immobilier (Fonds Propres)** :
+  $$\text{Fonds Propres} = \text{Valeur Estimée} - \sum \text{Capital Restant Dû des Prêts Rattachés}$$
+- **Plus-value latente immobilière** :
+  $$\text{Plus-value} = \text{Valeur Estimée} - (\text{Prix d'Achat} + \text{Frais de Notaire} + \text{Travaux})$$
+- **Ratios d'analyse** :
+  - $\text{LTV (Loan-To-Value)} = \frac{\text{Dette Restante Totale}}{\text{Valeur Estimée}} \times 100$
+  - $\text{Rendement brut locatif} = \frac{\text{Loyer Annuel}}{\text{Valeur Estimée}} \times 100$
+  - $\text{Rendement net locatif} = \frac{\text{Loyer Annuel} - \text{Charges Copropriété} - \text{Taxe Foncière}}{\text{Coût Total d'Acquisition}} \times 100$
+  - $\text{Cashflow net mensuel} = \text{Loyer Mensuel} - \text{Charges Mensuelles} - \frac{\text{Taxe Foncière}}{12} - \sum \text{Mensualités de Crédit}$
 
 ## 6. Système de Cotations & Cache
 

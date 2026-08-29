@@ -107,7 +107,6 @@ export async function GET(request: NextRequest) {
     const accountsWithPeriod = snapshot.accounts.map((a) => {
       const ownHoldings = snapshot.holdings.filter((h) => h.accountId === a.id);
       let startValue = 0;
-      let endValue = 0;
       let netFlows = 0;
       let change = 0;
 
@@ -115,12 +114,10 @@ export async function GET(request: NextRequest) {
         const bh = holdingPeriodChanges.get(h.id);
         if (bh) {
           startValue += bh.startValue;
-          endValue += bh.endValue;
           netFlows += bh.netFlows;
           change += bh.change;
         } else {
           startValue += 0;
-          endValue += h.value;
           netFlows += h.costBasis;
           change += 0;
         }

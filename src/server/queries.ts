@@ -8,10 +8,23 @@ import {
   instruments,
   loans,
   manualValues,
+  realEstateProperties,
   transactions,
 } from "@/db/schema";
 import type { ManualValue, Transaction } from "@/db/schema";
-import { requireUserId } from "./auth/session";
+import { requireUserId } from "@/server/auth/session";
+import {
+  computeLiabilitiesSummary,
+  computeLoanDetail,
+} from "./loans/amortization";
+import {
+  computePropertySummary,
+  computeRealEstateSummary,
+} from "./real-estate/calculations";
+import type {
+  PropertySummary,
+  RealEstateSummary,
+} from "./real-estate/types";
 import { buildSnapshot } from "./portfolio/snapshot";
 import { buildHistory } from "./portfolio/history";
 import type {
@@ -24,11 +37,6 @@ import type {
   LiabilitiesSummary,
   LoanDetail,
 } from "./loans/types";
-import {
-  computeLiabilitiesSummary,
-  computeLoanDetail,
-} from "./loans/amortization";
-
 /**
  * `cache()` déduplique l'appel sur toute la durée d'un rendu : le tableau, le
  * graphique et l'entête consomment le même instantané sans le recalculer.
@@ -203,3 +211,54 @@ export const getLoanDetail = cache(
     return computeLoanDetail(loan, { linkedAccountName, linkedHoldingLabel });
   },
 );
+
+export const getRealEstate = cache(async (): Promise<RealEstateSummary> => {
+  const userId = await requireUserId();
+  const [propertyRows, liabilities] = await Promise.all([
+    db
+      .select()
+      .from(realEstateProperties)
+      .where(eq(realEstateProperties.userId, userId))
+      .orderBy(desc(realEstateProperties.estimatedValue))
+      .all(),
+    getLiabilities(),
+  ]);
+
+  return computeRealEstateSummary(propertyRows, liabilities.loans);
+});
+
+export const getPropertyDetail = cache(
+  async (id: number): Promise<PropertySummary | null> => {
+    const userId = await requireUserId();
+    const [property, liabilities] = await Promise.all([
+      db
+        .select()
+        .from(realEstateProperties)
+        .where(
+          and(
+            eq(realEstateProperties.id, id),
+            eq(realEstateProperties.userId, userId),
+          ),
+        )
+        .get(),
+      getLiabilities(),
+    ]);
+
+    if (!property) return null;
+    return computePropertySummary(property, liabilities.loans);
+  },
+);
+
+export const getSimpleProperties = cache(async () => {
+  const userId = await requireUserId();
+  return db
+    .select({
+      id: realEstateProperties.id,
+      name: realEstateProperties.name,
+      category: realEstateProperties.category,
+    })
+    .from(realEstateProperties)
+    .where(eq(realEstateProperties.userId, userId))
+    .orderBy(asc(realEstateProperties.name))
+    .all();
+});

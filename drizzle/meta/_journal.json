@@ -50,6 +50,13 @@
       "when": 1787932019638,
       "tag": "0006_amazing_veda",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1788004603790,
+      "tag": "0007_wakeful_shatterstar",
+      "breakpoints": true
     }
   ]
 }
