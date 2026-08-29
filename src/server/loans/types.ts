@@ -47,9 +47,9 @@ export interface LoanSummary {
   notes: string | null;
   accountId: number | null;
   holdingId: number | null;
+  propertyId?: number | null;
   linkedAccountName?: string | null;
   linkedHoldingLabel?: string | null;
-
   // Métriques courantes calculées (à aujourd'hui)
   monthlyPayment: number; // Mensualité courante
   monthlyPrincipal: number; // Part de capital dans la mensualité courante

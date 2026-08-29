@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
   ArrowLeft,
@@ -63,13 +64,13 @@ interface PropertyViewProps {
   userName?: string;
   userEmail?: string;
 }
-
 export function PropertyView({
   property,
   availableLoans = [],
   userName = "Léo Scharf",
   userEmail,
 }: PropertyViewProps) {
+  const router = useRouter();
   const [activeTab, setActiveTab] = React.useState<
     "apercu" | "analyse" | "parametres"
   >("apercu");
@@ -233,9 +234,9 @@ export function PropertyView({
 
     const res = await updateProperty(property.id, payload);
     setIsSaving(false);
-
     if (res.ok) {
       toast.success("Paramètres enregistrés avec succès");
+      router.refresh();
     } else {
       toast.error(res.error);
     }
@@ -249,6 +250,7 @@ export function PropertyView({
 
     if (res.ok) {
       toast.success("Emprunts rattachés mis à jour");
+      router.refresh();
     } else {
       toast.error(res.error);
     }

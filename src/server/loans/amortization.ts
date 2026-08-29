@@ -276,9 +276,9 @@ export function computeLoanDetail(
     notes: loan.notes,
     accountId: loan.accountId,
     holdingId: loan.holdingId,
+    propertyId: loan.propertyId ?? null,
     linkedAccountName: options?.linkedAccountName ?? null,
     linkedHoldingLabel: options?.linkedHoldingLabel ?? null,
-
     monthlyPayment: Number(monthlyPayment.toFixed(2)),
     monthlyPrincipal: Number(monthlyPrincipal.toFixed(2)),
     monthlyInterest: Number(monthlyInterest.toFixed(2)),

@@ -32,7 +32,6 @@ export function computePropertySummary(
   // Filtrer les emprunts rattachés à ce bien
   const matchedLoans = allLoans.filter((l) => {
     // Si l'emprunt porte explicitement propertyId
-    // @ts-expect-error propertyId can exist on loan
     if (l.propertyId === property.id) return true;
     // Ou si le groupName correspond au nom du bien
     if (
@@ -42,9 +41,16 @@ export function computePropertySummary(
     ) {
       return true;
     }
+    // Ou si le groupe est "Résidence Principale" et le bien est la résidence principale
+    if (
+      property.category === "RESIDENCE_PRINCIPALE" &&
+      l.groupName &&
+      l.groupName.toLowerCase().trim() === "résidence principale"
+    ) {
+      return true;
+    }
     return false;
   });
-
   const linkedLoans: LinkedLoanInfo[] = matchedLoans.map((l) => ({
     id: l.id,
     name: l.name,
