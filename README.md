@@ -23,16 +23,25 @@
   - Gestion multi-devises avec conversion au taux de change historique du jour de chaque transaction pour isoler fidèlement l'effet de change.
 - **Courbe de performance réelle (1J à TOUT)** :
   - Performance calculée **nette des apports et retraits** : un versement de 500 € n'apparaît pas artificiellement comme un gain.
-- **Passif & Gestion des Emprunts (expérience complète type Finary)** :
+- **Patrimoine Immobilier & Actifs Physiques (expérience complète type Finary)** :
+  - Prise en charge des résidences principales, résidences secondaires, investissements locatifs, parkings/box, terrains et immeubles.
+  - **Fiche détaillée à 3 onglets** :
+    - *Aperçu* : valeur brute estimée, plus-value latente, patrimoine net immobilier (fonds propres), surface et prix au m², équipements et prestations clés.
+    - *Analyse* : structure financière (valeur vs dettes vs fonds propres), ratios d'endettement (LTV / Loan-To-Value), liste des emprunts associés avec mensualité et restant dû, rendements brut/net et cashflow mensuel (si locatif).
+    - *Paramètres* (6 sous-sections) :
+      1. *Description* : nom, type, catégorie d'usage, adresse, ville, code postal.
+      2. *Caractéristiques* : surface, prix d'achat, date d'achat, frais de notaire, travaux réalisés, valeur estimée, loyer et charges de copropriété.
+      3. *Détails* : compteurs interactifs pour étage, total étages, pièces, chambres, salles de bain, garages, places de parking, jardin, balcon/terrasse, et toggles (ascenseur, neuf, meublé).
+      4. *Pièces* : état et qualité des finitions (cuisine, salle de bain, sol, fenêtres, état général).
+      5. *Emprunts liés* : rattachement et dissociation directe des crédits immobiliers existants.
+      6. *Détention* : quote-part de propriété en pourcentage et badge propriétaire.
+  - **Patrimoine Net Immobilier** : $\text{Fonds Propres} = \text{Valeur Estimée} - \sum \text{Capital Restant Dû des Prêts Liés}$.
+- **Passif & Gestion des Emprunts** :
   - Prise en charge des crédits immobiliers, prêts à la consommation, PTZ (Prêt à Taux Zéro) et prêts in fine.
-  - **Regroupement par projet** : regroupez par exemple le prêt principal et le PTZ sous un même projet (*Résidence Principale*) avec totaux de capital restant dû et mensualités consolidés.
+  - **Liaison bidirectionnelle** : rattachement direct d'un ou plusieurs crédits à un bien immobilier.
   - **Moteur d'amortissement précis** : calcul automatique de l'échéancier mois par mois, part capital / intérêts / assurance, et courbe d'extinction de la dette.
-  - **Vue détaillée à 3 onglets** :
-    - *Aperçu* : grand montant du capital restant dû, phrase d'état, courbe interactive d'amortissement et indicateurs clés.
-    - *Analyse* : donut de répartition de la mensualité, décomposition du coût total, total remboursé et échéancier complet.
-    - *Paramètres* : modification des caractéristiques et possibilité de calibrer le solde au centime près sur vos relevés bancaires.
-  - **Calcul du Patrimoine Net** : $\text{Patrimoine Net} = \text{Actifs Bruts} - \text{Passif / Dettes}$ affiché en temps réel sur le tableau de bord.
-- **Mode discrétion (Privacy)** :
+  - **Vue détaillée à 3 onglets** (*Aperçu*, *Analyse*, *Paramètres*).
+  - **Calcul du Patrimoine Net consolidé** : $\text{Patrimoine Net} = \text{Actifs Bruts (Financier + Immobilier)} - \text{Passif / Dettes}$ affiché en temps réel sur le tableau de bord.
   - Masquage des montants d'un clic pour partager ou montrer son écran en public sans dévoiler ses chiffres (injecté dès le rendu serveur sans flash visuel).
 - **Intégrations & API** :
   - Endpoint REST `/api/summary` pour connecter des widgets de bureau ou scripts personnels.
