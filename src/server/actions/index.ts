@@ -307,15 +307,29 @@ export async function updateHolding(
     .object({
       label: z.string().trim().min(1).max(80).optional(),
       note: z.string().trim().max(500).optional().or(z.literal("")),
+      symbol: z.string().trim().nullable().optional(),
     })
     .safeParse(raw);
   if (!parsed.success) return fromZod(parsed.error);
 
+  const updateData: Record<string, unknown> = {};
+  if (parsed.data.label != null) updateData.label = parsed.data.label;
+  if (parsed.data.note !== undefined) updateData.note = parsed.data.note || null;
+
+  if (parsed.data.symbol !== undefined) {
+    if (parsed.data.symbol && parsed.data.symbol.trim() !== "") {
+      const instrument = await ensureInstrument(parsed.data.symbol);
+      updateData.instrumentId = instrument.id;
+      updateData.currency = instrument.currency;
+      updateData.kind = "QUOTED";
+    } else {
+      updateData.instrumentId = null;
+      updateData.kind = "MANUAL";
+    }
+  }
+
   db.update(holdings)
-    .set({
-      ...(parsed.data.label != null && { label: parsed.data.label }),
-      ...(parsed.data.note !== undefined && { note: parsed.data.note || null }),
-    })
+    .set(updateData)
     .where(eq(holdings.id, id))
     .run();
   refresh();

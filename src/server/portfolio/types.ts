@@ -44,8 +44,8 @@ export type HoldingSnapshot = {
   symbol: string | null;
   instrumentType: string | null;
   currency: string;
+  note?: string | null;
   quantity: number;
-  /** PRU dans la devise de la ligne */
   avgCost: number | null;
   /** Dernier cours connu, dans la devise de la ligne */
   lastPrice: number | null;

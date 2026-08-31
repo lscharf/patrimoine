@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { Montant } from "@/components/privacy/amount";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, Plus, Settings, Trash2 } from "lucide-react";
 import {
   DeleteConfirm,
+  HoldingDialog,
   ManualValueDialog,
   TransactionDialog,
 } from "@/components/forms";
@@ -87,6 +88,24 @@ export default async function HoldingPage({
           </Link>
 
           <div className="flex items-center gap-2">
+            <HoldingDialog
+              accountId={h.accountId}
+              accountName={h.accountName}
+              initial={{
+                id: h.id,
+                label: h.label,
+                note: h.note,
+                symbol: h.symbol,
+                kind: h.kind,
+                currency: h.currency,
+              }}
+              trigger={
+                <Button size="sm" variant="outline" className="gap-1.5">
+                  <Settings className="size-3.5" aria-hidden />
+                  <span>Modifier le ticker / ligne</span>
+                </Button>
+              }
+            />
             {h.kind === "MANUAL" && (
               <ManualValueDialog
                 holdingId={h.id}

@@ -4,6 +4,7 @@ import * as React from "react";
 import { toast } from "sonner";
 
 import {
+  Badge,
   Button,
   Dialog,
   DialogClose,
@@ -79,8 +80,10 @@ export interface HoldingInitial {
   id: number;
   label: string;
   note?: string | null;
+  symbol?: string | null;
+  kind?: string;
+  currency?: string;
 }
-
 export interface HoldingDialogProps {
   /** Compte auquel la ligne est rattachée. */
   accountId: number;
@@ -429,12 +432,21 @@ function EditForm({
   const { pending, errors, save } = useSave(onDone, onSaved);
   const [label, setLabel] = React.useState(initial.label);
   const [note, setNote] = React.useState(initial.note ?? "");
+  const [symbol, setSymbol] = React.useState<string | null>(
+    initial.symbol ?? null,
+  );
+  const [changingTicker, setChangingTicker] = React.useState(false);
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (pending) return;
     save(
-      () => updateHolding(initial.id, { label, note: note.trim() }),
+      () =>
+        updateHolding(initial.id, {
+          label,
+          note: note.trim(),
+          symbol: symbol || null,
+        }),
       "Ligne mise à jour.",
     );
   }
@@ -456,11 +468,82 @@ function EditForm({
         <FieldError message={errors.label} />
       </div>
 
+      {/* Setting : Ticker coté associé */}
+      <div className="flex flex-col gap-2 rounded-lg border border-hairline bg-surface-muted/30 p-3 text-xs">
+        <div className="flex items-center justify-between">
+          <span className="font-semibold text-ink">
+            Ticker & Cotation en direct
+          </span>
+          {symbol && !changingTicker && (
+            <Badge variant="accent" className="font-mono text-[11px]">
+              {symbol}
+            </Badge>
+          )}
+        </div>
+
+        {changingTicker ? (
+          <div className="space-y-2 pt-1">
+            <p className="text-[11px] text-ink-muted">
+              Recherchez une action, un ETF, une crypto ou un fonds (ex: CW8.PA, AAPL, 0P0000TQBU.F...) :
+            </p>
+            <InstrumentSearch
+              onSelect={(hit) => {
+                setSymbol(hit.symbol);
+                if (!label || label === initial.label) {
+                  setLabel(hit.name);
+                }
+                setChangingTicker(false);
+              }}
+            />
+            <div className="flex justify-end gap-2 pt-1">
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                onClick={() => setChangingTicker(false)}
+              >
+                Annuler
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+            <span className="text-ink-muted text-[11px]">
+              {symbol
+                ? `Cotation automatique via le symbole ${symbol}`
+                : "Aucun ticker lié (ligne en valorisation manuelle)"}
+            </span>
+            <div className="flex items-center gap-1.5">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-7 text-xs"
+                onClick={() => setChangingTicker(true)}
+              >
+                {symbol ? "Modifier le ticker" : "Lier un ticker"}
+              </Button>
+              {symbol && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 text-xs text-negative hover:bg-negative/10"
+                  onClick={() => setSymbol(null)}
+                >
+                  Dissocier
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="holding-edit-note">Note</Label>
         <Textarea
           id="holding-edit-note"
-          rows={3}
+          rows={2}
           value={note}
           onChange={(event) => setNote(event.target.value)}
           maxLength={500}

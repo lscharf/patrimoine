@@ -36,11 +36,11 @@ export type LoadedHolding = {
   label: string;
   kind: HoldingKind;
   currency: string;
+  note: string | null;
   instrumentId: number | null;
   instrument: Instrument | null;
   txs: Transaction[];
 };
-
 /**
  * Charge le portefeuille d'un utilisateur en mémoire — SQLite local, quelques ms.
  *
@@ -86,6 +86,7 @@ export function loadPortfolio(userId: string) {
     label: h.label,
     kind: h.kind as HoldingKind,
     currency: h.currency,
+    note: h.note,
     instrumentId: h.instrumentId,
     instrument: i ?? null,
     txs: txByHolding.get(h.id) ?? [],
@@ -215,6 +216,7 @@ export async function buildSnapshot(userId: string): Promise<PortfolioSnapshot> 
       symbol: instrument?.symbol ?? null,
       instrumentType: instrument?.type ?? null,
       currency,
+      note: h.note ?? null,
       quantity: basis.quantity,
       avgCost: basis.avgCost,
       lastPrice,
