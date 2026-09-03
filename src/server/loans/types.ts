@@ -43,6 +43,7 @@ export interface LoanSummary {
   endDate: string;
   customMonthlyPayment: number | null;
   currentBalance: number | null;
+  currentBalanceDate: string | null;
   groupName: string | null;
   notes: string | null;
   accountId: number | null;

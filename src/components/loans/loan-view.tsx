@@ -70,6 +70,9 @@ export function LoanView({ loan, accounts }: LoanViewProps) {
   const [currentBalance, setCurrentBalance] = React.useState(
     loan.currentBalance != null ? String(loan.currentBalance) : "",
   );
+  const [currentBalanceDate, setCurrentBalanceDate] = React.useState(
+    loan.currentBalanceDate ?? "",
+  );
   const [accountId, setAccountId] = React.useState<string>(
     loan.accountId ? String(loan.accountId) : "none",
   );
@@ -104,6 +107,7 @@ export function LoanView({ loan, accounts }: LoanViewProps) {
       currentBalance: currentBalance
         ? currentBalance.replace(",", ".")
         : undefined,
+      currentBalanceDate: currentBalanceDate || undefined,
       groupName: groupName.trim() || undefined,
       accountId: accountId !== "none" ? Number(accountId) : null,
       notes: notes || undefined,
@@ -623,6 +627,22 @@ export function LoanView({ loan, accounts }: LoanViewProps) {
                     onChange={(e) => setCurrentBalance(e.target.value)}
                   />
                 </div>
+                {currentBalance && (
+                  <div className="space-y-1.5 sm:col-span-2">
+                    <Label htmlFor="param-balance-date">
+                      Date de constatation du solde{" "}
+                      <span className="text-xs text-ink-faint">
+                        (date à laquelle ce solde a été relevé — le moteur extrapolera ensuite dynamiquement)
+                      </span>
+                    </Label>
+                    <Input
+                      id="param-balance-date"
+                      type="date"
+                      value={currentBalanceDate}
+                      onChange={(e) => setCurrentBalanceDate(e.target.value)}
+                    />
+                  </div>
+                )}
               </div>
             </div>
 

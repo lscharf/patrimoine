@@ -1,0 +1,1 @@
+ALTER TABLE `loans` ADD `current_balance_date` text;

@@ -57,6 +57,13 @@
       "when": 1788004603790,
       "tag": "0007_wakeful_shatterstar",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1788474044713,
+      "tag": "0008_same_shadow_king",
+      "breakpoints": true
     }
   ]
 }

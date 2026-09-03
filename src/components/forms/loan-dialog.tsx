@@ -63,6 +63,7 @@ export interface LoanInitial {
   startDate: string;
   customMonthlyPayment?: number | null;
   currentBalance?: number | null;
+  currentBalanceDate?: string | null;
   groupName?: string | null;
   accountId?: number | null;
   notes?: string | null;
@@ -121,6 +122,9 @@ function LoanForm({
   const [currentBalance, setCurrentBalance] = React.useState(
     initial?.currentBalance != null ? String(initial.currentBalance) : "",
   );
+  const [currentBalanceDate, setCurrentBalanceDate] = React.useState(
+    initial?.currentBalanceDate ?? "",
+  );
   const [groupName, setGroupName] = React.useState(initial?.groupName ?? "");
   const [accountId, setAccountId] = React.useState<string>(
     initial?.accountId ? String(initial.accountId) : "none",
@@ -159,6 +163,7 @@ function LoanForm({
       currentBalance: currentBalance
         ? currentBalance.replace(",", ".")
         : undefined,
+      currentBalanceDate: currentBalanceDate || undefined,
       groupName: groupName.trim() || undefined,
       accountId: accountId !== "none" ? Number(accountId) : null,
       notes: notes || undefined,
@@ -367,6 +372,22 @@ function LoanForm({
             onChange={(e) => setCurrentBalance(e.target.value)}
           />
         </div>
+        {currentBalance && (
+          <div className="space-y-1.5 sm:col-span-2">
+            <Label htmlFor="loan-current-balance-date">
+              Date de constatation du solde
+              <span className="ml-1 text-xs text-ink-faint">
+                (date à laquelle ce solde a été relevé — le moteur extrapolera ensuite dynamiquement)
+              </span>
+            </Label>
+            <Input
+              id="loan-current-balance-date"
+              type="date"
+              value={currentBalanceDate}
+              onChange={(e) => setCurrentBalanceDate(e.target.value)}
+            />
+          </div>
+        )}
         <div className="space-y-1.5 sm:col-span-2">
           <Label htmlFor="loan-group-name">
             Groupe / Projet

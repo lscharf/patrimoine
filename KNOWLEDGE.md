@@ -175,10 +175,11 @@ $$\text{Performance (\%)} = \frac{\text{Performance (€)}}{V_{\text{start}} + \
   $$M_{\text{base}} = \frac{C \cdot r}{1 - (1 + r)^{-n}} \quad (\text{ou } \frac{C}{n} \text{ si } r = 0)$$
   $$M_{\text{assurance}} = \frac{C \cdot (\text{Taux d'assurance annuel} / 100)}{12}$$
   $$M_{\text{totale}} = M_{\text{base}} + M_{\text{assurance}}$$
-- **Échéancier complet** : Décomposition mois par mois (Capital amorti, Intérêts, Assurance, Capital restant dû).
+- **Échéancier complet & Extrapolation dynamique** : Décomposition mois par mois (Capital amorti, Intérêts, Assurance, Capital restant dû).
+  - Si un solde constaté (`currentBalance`) et sa date (`currentBalanceDate`) sont fournis, le moteur interpole le passé et **extrapole dynamiquement le futur** mois par mois (décroissance automatique à chaque passage de mois, calcul fidèle au centime aux banques/Finary).
+  - **Coût total & % Remboursé** : Calibrés de manière cohérente ($\text{Total Payé Passé} + \text{Total Restant Dû Futur} + \text{Frais}$).
 - **Patrimoine Net consolidé** :
   $$\text{Patrimoine Net} = \text{Actifs Bruts (Financier + Immobilier)} - \sum \text{Capital Restant Dû des Emprunts Actifs}$$
-
 ### 5.6. Moteur Immobilier — `src/server/real-estate/calculations.ts`
 - **Patrimoine Net Immobilier (Fonds Propres)** :
   $$\text{Fonds Propres} = \text{Valeur Estimée} - \sum \text{Capital Restant Dû des Prêts Rattachés}$$

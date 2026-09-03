@@ -303,6 +303,8 @@ export const loans = sqliteTable(
     customMonthlyPayment: real("custom_monthly_payment"),
     /** Capital restant dû actuel calibré / manuel (facultatif) */
     currentBalance: real("current_balance"),
+    /** Date du capital restant dû calibré (YYYY-MM-DD, facultatif) */
+    currentBalanceDate: text("current_balance_date"),
     /** Compte ou ligne d'actif lié(e) (optionnel) */
     accountId: integer("account_id").references(() => accounts.id, {
       onDelete: "set null",

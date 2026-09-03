@@ -67,6 +67,8 @@ export function generateAmortizationSchedule(loan: {
   startDate: string;
   type?: string;
   customMonthlyPayment?: number | null;
+  currentBalance?: number | null;
+  currentBalanceDate?: string | null;
 }): AmortizationScheduleRow[] {
   const schedule: AmortizationScheduleRow[] = [];
   const type = (loan.type as LoanType) || "AMORTIZING";
@@ -82,7 +84,6 @@ export function generateAmortizationSchedule(loan: {
     type,
   );
 
-  // Si une mensualité personnalisée est fournie et > assurance, elle prévaut
   if (
     loan.customMonthlyPayment &&
     loan.customMonthlyPayment > monthlyInsurance
@@ -90,37 +91,132 @@ export function generateAmortizationSchedule(loan: {
     calculatedBaseMonthly = loan.customMonthlyPayment - monthlyInsurance;
   }
 
-  let remainingPrincipal = principal;
+  // Cas 1 : Pas de capital restant dû calibré -> échéancier théorique standard
+  if (loan.currentBalance == null || loan.currentBalance < 0) {
+    let remainingPrincipal = principal;
 
-  for (let m = 1; m <= duration; m++) {
+    for (let m = 1; m <= duration; m++) {
+      const date = addMonthsToIsoDate(loan.startDate, m - 1);
+      let interest = 0;
+      let principalPayment = 0;
+
+      if (type === "IN_FINE") {
+        interest = remainingPrincipal * monthlyInterestRate;
+        principalPayment = m === duration ? remainingPrincipal : 0;
+      } else if (type === "PTZ" || loan.interestRate <= 0) {
+        interest = 0;
+        if (loan.customMonthlyPayment && loan.customMonthlyPayment > monthlyInsurance) {
+          principalPayment = Math.min(remainingPrincipal, calculatedBaseMonthly);
+        } else {
+          principalPayment = m === duration ? remainingPrincipal : principal / duration;
+        }
+      } else {
+        interest = remainingPrincipal * monthlyInterestRate;
+        if (m === duration) {
+          principalPayment = remainingPrincipal;
+        } else {
+          principalPayment = Math.min(
+            remainingPrincipal,
+            Math.max(0, calculatedBaseMonthly - interest),
+          );
+        }
+      }
+
+      remainingPrincipal = Math.max(0, remainingPrincipal - principalPayment);
+      const totalPayment = principalPayment + interest + monthlyInsurance;
+
+      schedule.push({
+        installmentNumber: m,
+        date,
+        principalPayment: Number(principalPayment.toFixed(2)),
+        interestPayment: Number(interest.toFixed(2)),
+        insurancePayment: Number(monthlyInsurance.toFixed(2)),
+        totalPayment: Number(totalPayment.toFixed(2)),
+        remainingPrincipal: Number(remainingPrincipal.toFixed(2)),
+      });
+    }
+
+    return schedule;
+  }
+
+  // Cas 2 : Capital restant dû calibré -> extrapolation dynamique
+  const anchorYm = loan.currentBalanceDate
+    ? loan.currentBalanceDate.slice(0, 7)
+    : "2026-08";
+  const [anchorY, anchorM] = anchorYm.split("-").map(Number);
+  const [startY, startM] = loan.startDate.slice(0, 7).split("-").map(Number);
+
+  const pastMonths = Math.min(
+    duration - 1,
+    Math.max(0, (anchorY - startY) * 12 + (anchorM - startM)),
+  );
+  const remainingMonths = Math.max(1, duration - pastMonths);
+
+  // 1) Échéances passées jusqu'au point d'ancrage
+  if (pastMonths > 0) {
+    const totalCapDrop = Math.max(0, principal - loan.currentBalance);
+    let pastRemaining = principal;
+    const monthlyCapDrop = totalCapDrop / pastMonths;
+
+    for (let m = 1; m <= pastMonths; m++) {
+      const date = addMonthsToIsoDate(loan.startDate, m - 1);
+      const interest =
+        type === "PTZ" || loan.interestRate <= 0
+          ? 0
+          : pastRemaining * monthlyInterestRate;
+      const principalPayment =
+        m === pastMonths
+          ? Math.max(0, pastRemaining - loan.currentBalance)
+          : monthlyCapDrop;
+      pastRemaining = Math.max(loan.currentBalance, pastRemaining - principalPayment);
+      const totalPayment = principalPayment + interest + monthlyInsurance;
+
+      schedule.push({
+        installmentNumber: m,
+        date,
+        principalPayment: Number(principalPayment.toFixed(2)),
+        interestPayment: Number(interest.toFixed(2)),
+        insurancePayment: Number(monthlyInsurance.toFixed(2)),
+        totalPayment: Number(totalPayment.toFixed(2)),
+        remainingPrincipal: Number(
+          (m === pastMonths ? loan.currentBalance : pastRemaining).toFixed(2),
+        ),
+      });
+    }
+  }
+
+  // 2) Échéances futures à partir de l'ancrage : extrapolation mois par mois
+  let futureRemaining = loan.currentBalance;
+  for (let k = 1; k <= remainingMonths; k++) {
+    const m = pastMonths + k;
     const date = addMonthsToIsoDate(loan.startDate, m - 1);
     let interest = 0;
     let principalPayment = 0;
 
     if (type === "IN_FINE") {
-      interest = remainingPrincipal * monthlyInterestRate;
-      principalPayment = m === duration ? remainingPrincipal : 0;
+      interest = futureRemaining * monthlyInterestRate;
+      principalPayment = k === remainingMonths ? futureRemaining : 0;
     } else if (type === "PTZ" || loan.interestRate <= 0) {
       interest = 0;
       if (loan.customMonthlyPayment && loan.customMonthlyPayment > monthlyInsurance) {
-        principalPayment = Math.min(remainingPrincipal, calculatedBaseMonthly);
+        principalPayment = Math.min(futureRemaining, calculatedBaseMonthly);
       } else {
-        principalPayment = m === duration ? remainingPrincipal : principal / duration;
+        principalPayment =
+          k === remainingMonths ? futureRemaining : futureRemaining / remainingMonths;
       }
     } else {
-      // Amortissable standard
-      interest = remainingPrincipal * monthlyInterestRate;
-      if (m === duration) {
-        principalPayment = remainingPrincipal;
+      interest = futureRemaining * monthlyInterestRate;
+      if (k === remainingMonths) {
+        principalPayment = futureRemaining;
       } else {
         principalPayment = Math.min(
-          remainingPrincipal,
+          futureRemaining,
           Math.max(0, calculatedBaseMonthly - interest),
         );
       }
     }
 
-    remainingPrincipal = Math.max(0, remainingPrincipal - principalPayment);
+    futureRemaining = Math.max(0, futureRemaining - principalPayment);
     const totalPayment = principalPayment + interest + monthlyInsurance;
 
     schedule.push({
@@ -130,7 +226,7 @@ export function generateAmortizationSchedule(loan: {
       interestPayment: Number(interest.toFixed(2)),
       insurancePayment: Number(monthlyInsurance.toFixed(2)),
       totalPayment: Number(totalPayment.toFixed(2)),
-      remainingPrincipal: Number(remainingPrincipal.toFixed(2)),
+      remainingPrincipal: Number(futureRemaining.toFixed(2)),
     });
   }
 
@@ -149,52 +245,39 @@ export function computeLoanDetail(
   const referenceDate =
     options?.referenceDate ?? new Date().toISOString().slice(0, 10);
 
-  const rawSchedule = generateAmortizationSchedule(loan);
+  const schedule = generateAmortizationSchedule(loan);
   const type = (loan.type as LoanType) || "AMORTIZING";
   const endDate =
-    rawSchedule.length > 0
-      ? rawSchedule[rawSchedule.length - 1].date
+    schedule.length > 0
+      ? schedule[schedule.length - 1].date
       : addMonthsToIsoDate(loan.startDate, loan.durationMonths);
 
   // Déterminer les échéances passées et futures
-  const pastInstallments = rawSchedule.filter((row) => row.date <= referenceDate);
+  // Une mensualité est considérée échue si sa date est <= referenceDate,
+  // ou si son mois calendaire correspond au mois courant de référence (ex: échéance de septembre pour une consultation en septembre)
+  const refYm = referenceDate.slice(0, 7);
+  const pastInstallments = schedule.filter((row) => {
+    if (row.date <= referenceDate) return true;
+    if (row.date.slice(0, 7) <= refYm) return true;
+    return false;
+  });
+
   const paidCount = pastInstallments.length;
-  const remainingCount = Math.max(0, rawSchedule.length - paidCount);
+  const remainingCount = Math.max(0, schedule.length - paidCount);
 
-  // Calibrage du tableau d'amortissement si un solde actuel spécifique est renseigné
-  const schedule: AmortizationScheduleRow[] = [];
-  let remainingAfterCalibration =
-    loan.currentBalance != null && loan.currentBalance >= 0
-      ? loan.currentBalance
-      : (pastInstallments.length > 0
-          ? pastInstallments[pastInstallments.length - 1].remainingPrincipal
-          : loan.borrowedAmount);
-
-  for (let i = 0; i < rawSchedule.length; i++) {
-    const row = { ...rawSchedule[i] };
-    if (i < paidCount) {
-      schedule.push(row);
-    } else {
-      const principalPart = Math.min(remainingAfterCalibration, row.principalPayment);
-      remainingAfterCalibration = Math.max(0, remainingAfterCalibration - principalPart);
-      row.remainingPrincipal = Number(remainingAfterCalibration.toFixed(2));
-      schedule.push(row);
-    }
-  }
-
-  const lastPayment = pastInstallments.length > 0 ? pastInstallments[pastInstallments.length - 1] : null;
+  const lastPayment =
+    pastInstallments.length > 0 ? pastInstallments[pastInstallments.length - 1] : null;
   const nextPayment = paidCount < schedule.length ? schedule[paidCount] : null;
 
-  // Capital restant dû actuel
+  // Capital restant dû actuel : c'est directement le solde après la dernière mensualité échue
   let currentRemainingCapital = loan.borrowedAmount;
-  if (loan.currentBalance != null && loan.currentBalance >= 0) {
-    currentRemainingCapital = loan.currentBalance;
-  } else if (lastPayment) {
+  if (lastPayment) {
     currentRemainingCapital = lastPayment.remainingPrincipal;
   }
   if (paidCount >= schedule.length) {
     currentRemainingCapital = 0;
   }
+
   // Cumuls payés
   let paidCapital = 0;
   let paidInterest = 0;
@@ -204,26 +287,24 @@ export function computeLoanDetail(
     paidInterest += row.interestPayment;
     paidInsurance += row.insurancePayment;
   }
-  if (loan.currentBalance != null && loan.currentBalance >= 0) {
-    paidCapital = Math.max(0, loan.borrowedAmount - loan.currentBalance);
-  }
   const totalPaid = paidCapital + paidInterest + paidInsurance;
-
-  // Totaux sur toute la durée
-  let totalInterest = 0;
-  let totalInsurance = 0;
-  for (const row of schedule) {
-    totalInterest += row.interestPayment;
-    totalInsurance += row.insurancePayment;
-  }
-  const totalCost =
-    loan.borrowedAmount + totalInterest + totalInsurance + (loan.initialFees || 0);
 
   // Encours restant dû total (somme des mensualités futures restantes)
   let totalOutstandingDue = 0;
   for (let i = paidCount; i < schedule.length; i++) {
     totalOutstandingDue += schedule[i].totalPayment;
   }
+
+  // Totaux sur toute la durée
+  const totalCost = totalPaid + totalOutstandingDue + (loan.initialFees || 0);
+
+  let totalInterest = 0;
+  let totalInsurance = 0;
+  for (const row of schedule) {
+    totalInterest += row.interestPayment;
+    totalInsurance += row.insurancePayment;
+  }
+
 
   // Mensualité actuelle (selon la prochaine échéance ou la dernière)
   const currentInstallment = nextPayment ?? lastPayment ?? schedule[0];
@@ -272,6 +353,7 @@ export function computeLoanDetail(
     endDate,
     customMonthlyPayment: loan.customMonthlyPayment,
     currentBalance: loan.currentBalance ?? null,
+    currentBalanceDate: loan.currentBalanceDate ?? null,
     groupName: loan.groupName ?? null,
     notes: loan.notes,
     accountId: loan.accountId,
