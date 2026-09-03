@@ -143,13 +143,18 @@ export function generateAmortizationSchedule(loan: {
   const anchorYm = loan.currentBalanceDate
     ? loan.currentBalanceDate.slice(0, 7)
     : "2026-08";
-  const [anchorY, anchorM] = anchorYm.split("-").map(Number);
-  const [startY, startM] = loan.startDate.slice(0, 7).split("-").map(Number);
 
-  const pastMonths = Math.min(
-    duration - 1,
-    Math.max(0, (anchorY - startY) * 12 + (anchorM - startM)),
-  );
+  // Trouver l'échéance exacte correspondant au mois d'ancrage
+  let pastMonths = 0;
+  for (let m = 1; m <= duration; m++) {
+    const d = addMonthsToIsoDate(loan.startDate, m - 1);
+    if (d.slice(0, 7) <= anchorYm) {
+      pastMonths = m;
+    } else {
+      break;
+    }
+  }
+  pastMonths = Math.min(duration - 1, Math.max(0, pastMonths));
   const remainingMonths = Math.max(1, duration - pastMonths);
 
   // 1) Échéances passées jusqu'au point d'ancrage
